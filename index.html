@@ -141,755 +141,779 @@
   .stat-box .lbl{font-size:11.5px; color:var(--ink-soft); margin-top:2px;}
 </style>
 
-<!-- Firebase Compat CDN (로컬 더블클릭 file:/// 환경에서도 에러 없이 로드됨) -->
-<script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore-compat.js"></script>
+<!-- Firebase SDK 로드 -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+
+<div id="app">
+  <!-- 초기 로딩 안내 (JS가 정상 동작하면 홈 화면으로 자동 교체됩니다) -->
+  <div class="center" style="padding: 80px 20px;">
+    <h2 style="font-size: 22px; margin-bottom: 8px;">화면을 불러오는 중입니다...</h2>
+    <p class="muted">잠시만 기다려 주세요.</p>
+  </div>
+</div>
 
 <script>
-  // Firebase 설정 적용
-  const firebaseConfig = {
-    apiKey: "AIzaSyBj5JyhfmNCjk9n6HSAPIkF_gbDLxi6yiE",
-    authDomain: "humanrigthts-auction.firebaseapp.com",
-    projectId: "humanrigthts-auction",
-    storageBucket: "humanrigthts-auction.firebasestorage.app",
-    messagingSenderId: "898677950362",
-    appId: "1:898677950362:web:f75862b72547449ff35c23"
-  };
+window.addEventListener('DOMContentLoaded', function() {
+  try {
+    const firebaseConfig = {
+      apiKey: "AIzaSyBj5JyhfmNCjk9n6HSAPIkF_gbDLxi6yiE",
+      authDomain: "humanrigthts-auction.firebaseapp.com",
+      projectId: "humanrigthts-auction",
+      storageBucket: "humanrigthts-auction.firebasestorage.app",
+      messagingSenderId: "898677950362",
+      appId: "1:898677950362:web:f75862b72547449ff35c23"
+    };
 
-  firebase.initializeApp(firebaseConfig);
-  const db = firebase.firestore();
-
-  /* ---------- State & Utilities ---------- */
-  function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
-  function roomCodeGen(){ return String(Math.floor(1000 + Math.random()*9000)); }
-  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-
-  let toastTimer=null;
-  function toast(msg){
-    let t = document.getElementById('toast');
-    if(!t){
-      t = document.createElement('div');
-      t.id='toast'; t.className='toast';
-      document.body.appendChild(t);
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
     }
-    t.textContent = msg;
-    t.style.display='block';
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(()=>{ t.style.display='none'; }, 2600);
-  }
+    const db = firebase.firestore();
 
-  const DEFAULT_VALUES = [
-    {name:'생명권', desc:'모든 사람은 생명을 존중받고 안전하게 살아갈 권리가 있다', price:50},
-    {name:'자유권', desc:'자신의 생각과 행동을 스스로 결정할 자유', price:50},
-    {name:'평등권', desc:'성별, 신분, 인종에 관계없이 동등하게 대우받을 권리', price:50},
-    {name:'행복추구권', desc:'자신이 원하는 삶의 방식으로 행복을 추구할 권리', price:50},
-    {name:'교육받을 권리', desc:'배우고 성장할 기회를 보장받을 권리', price:50},
-    {name:'사생활의 자유', desc:'개인의 사적인 영역을 존중받을 권리', price:50},
-    {name:'표현의 자유', desc:'자신의 생각을 자유롭게 말하고 표현할 권리', price:50},
-    {name:'노동의 권리', desc:'정당한 대가를 받으며 일할 권리', price:50},
-    {name:'참정권', desc:'정치에 참여하고 투표할 권리', price:50},
-    {name:'안전하게 살 권리', desc:'폭력과 위험으로부터 보호받을 권리', price:50}
-  ];
+    /* ---------- State & Utilities ---------- */
+    function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+    function roomCodeGen(){ return String(Math.floor(1000 + Math.random()*9000)); }
+    function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-  let state = {
-    screen:'home',
-    role:null,
-    roomCode:null,
-    studentId:null,
-    studentName:'',
-    draftBudget:1000,
-    draftMaxProposals: 10,
-    draftMaxItems: 3,
-    draftItems: DEFAULT_VALUES.map(v=>({id:uid(), ...v})),
-    room:null,
-    students:[],
-    proposals:[],
-    bid:null,
-    unsubscribers:[],
-    countdownHandle:null,
-    webhookUrl:''
-  };
+    let toastTimer=null;
+    function toast(msg){
+      let t = document.getElementById('toast');
+      if(!t){
+        t = document.createElement('div');
+        t.id='toast'; t.className='toast';
+        document.body.appendChild(t);
+      }
+      t.textContent = msg;
+      t.style.display='block';
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(()=>{ t.style.display='none'; }, 2600);
+    }
 
-  function goto(screen){
-    state.unsubscribers.forEach(u => u());
-    state.unsubscribers = [];
-    if(state.countdownHandle){ clearInterval(state.countdownHandle); state.countdownHandle=null; }
-    state.screen = screen;
-    render();
-  }
+    const DEFAULT_VALUES = [
+      {name:'생명권', desc:'모든 사람은 생명을 존중받고 안전하게 살아갈 권리가 있다', price:50},
+      {name:'자유권', desc:'자신의 생각과 행동을 스스로 결정할 자유', price:50},
+      {name:'평등권', desc:'성별, 신분, 인종에 관계없이 동등하게 대우받을 권리', price:50},
+      {name:'행복추구권', desc:'자신이 원하는 삶의 방식으로 행복을 추구할 권리', price:50},
+      {name:'교육받을 권리', desc:'배우고 성장할 기회를 보장받을 권리', price:50},
+      {name:'사생활의 자유', desc:'개인의 사적인 영역을 존중받을 권리', price:50},
+      {name:'표현의 자유', desc:'자신의 생각을 자유롭게 말하고 표현할 권리', price:50},
+      {name:'노동의 권리', desc:'정당한 대가를 받으며 일할 권리', price:50},
+      {name:'참정권', desc:'정치에 참여하고 투표할 권리', price:50},
+      {name:'안전하게 살 권리', desc:'폭력과 위험으로부터 보호받을 권리', price:50}
+    ];
 
-  function manageCountdownTicker(status, b){
-    if(status !== 'countdown'){
+    let state = {
+      screen:'home',
+      role:null,
+      roomCode:null,
+      studentId:null,
+      studentName:'',
+      draftBudget:1000,
+      draftMaxProposals: 10,
+      draftMaxItems: 3,
+      draftItems: DEFAULT_VALUES.map(v=>({id:uid(), ...v})),
+      room:null,
+      students:[],
+      proposals:[],
+      bid:null,
+      unsubscribers:[],
+      countdownHandle:null,
+      webhookUrl:''
+    };
+
+    function goto(screen){
+      state.unsubscribers.forEach(u => u());
+      state.unsubscribers = [];
       if(state.countdownHandle){ clearInterval(state.countdownHandle); state.countdownHandle=null; }
-      return;
+      state.screen = screen;
+      render();
     }
-    if(state.countdownHandle) return;
-    const tick = () => {
-      const el = document.getElementById('countdownNum');
-      if(!el || !state.bid || state.bid.status !== 'countdown'){
-        clearInterval(state.countdownHandle); state.countdownHandle=null; return;
+
+    function manageCountdownTicker(status, b){
+      if(status !== 'countdown'){
+        if(state.countdownHandle){ clearInterval(state.countdownHandle); state.countdownHandle=null; }
+        return;
       }
-      const remainingMs = (state.bid.countdownEndAt || 0) - Date.now();
-      const secs = Math.max(0, Math.ceil(remainingMs/1000));
-      el.textContent = secs;
-    };
-    tick();
-    state.countdownHandle = setInterval(tick, 200);
-  }
-
-  /* ================= REALTIME SYNC ================= */
-  function bindRoomRealtime(code){
-    const unsubRoom = db.collection("rooms").doc(code).onSnapshot((snap) => {
-      if(!snap.exists) return;
-      state.room = snap.data();
-      render();
-    });
-    state.unsubscribers.push(unsubRoom);
-
-    const unsubStudents = db.collection("rooms").doc(code).collection("students").orderBy("joinedAt", "asc").onSnapshot((snap) => {
-      state.students = snap.docs.map(d => d.data());
-      render();
-    });
-    state.unsubscribers.push(unsubStudents);
-
-    const unsubProposals = db.collection("rooms").doc(code).collection("proposals").orderBy("createdAt", "asc").onSnapshot((snap) => {
-      state.proposals = snap.docs.map(d => d.data());
-      render();
-    });
-    state.unsubscribers.push(unsubProposals);
-  }
-
-  function bindBidRealtime(code, idx){
-    const unsubBid = db.collection("rooms").doc(code).collection("bids").doc(String(idx)).onSnapshot((snap) => {
-      state.bid = snap.exists ? snap.data() : null;
-      render();
-    });
-    state.unsubscribers.push(unsubBid);
-  }
-
-  /* ================= RENDER ================= */
-  function render(){
-    const appEl = document.getElementById('app');
-    if(!appEl) return;
-    if(state.screen==='home') appEl.innerHTML = renderHome();
-    else if(state.screen==='teacher-create') appEl.innerHTML = renderTeacherCreate();
-    else if(state.screen==='teacher-room') appEl.innerHTML = renderTeacherRoom();
-    else if(state.screen==='student-join') appEl.innerHTML = renderStudentJoin();
-    else if(state.screen==='student-room') appEl.innerHTML = renderStudentRoom();
-    attachHandlers();
-  }
-
-  function renderHome(){
-    return `
-    <div class="home-hero">
-      <p class="eyebrow">도덕 수업 · 인권 가치 경매</p>
-      <h1>가치 경매</h1>
-      <p>한정된 예산으로 인권 가치를 두고 경합합니다.<br>무엇에 얼마의 값을 매길 것인가, 그 선택이 곧 우리의 가치관입니다.</p>
-    </div>
-    <div class="stack" style="margin-top:26px;">
-      <div class="choice-card" data-go="teacher-create">
-        <h3>선생님으로 시작하기</h3>
-        <p>경매방을 만들고 진행합니다. 가치 목록 설정, 실시간 입찰 진행, 결과를 구글 시트로 정리할 수 있어요.</p>
-      </div>
-      <div class="choice-card" data-go="student-join">
-        <h3>학생으로 참여하기</h3>
-        <p>선생님이 알려준 방 코드로 입장해 예산 안에서 원하는 가치에 입찰합니다.</p>
-      </div>
-    </div>
-    <p class="footer-note">각 기기(학생 개인 스마트폰·태블릿)에서 이 화면을 열어 참여하세요.</p>
-    `;
-  }
-
-  function renderTeacherCreate(){
-    const itemsHtml = state.draftItems.map((it, i)=>`
-      <div class="item-row" data-item-id="${it.id}">
-        <div class="item-num">${i+1}</div>
-        <div class="item-fields">
-          <input type="text" class="it-name" placeholder="가치 이름" value="${esc(it.name)}">
-          <textarea class="it-desc" placeholder="설명">${esc(it.desc)}</textarea>
-          <input type="number" class="it-price" placeholder="시작가" value="${it.price}" min="0">
-        </div>
-        <button class="remove-x" data-remove-item="${it.id}" title="삭제">✕</button>
-      </div>
-    `).join('');
-
-    return `
-    <div class="topbar"><button class="linkbtn" data-go="home">← 처음으로</button></div>
-    <h2 style="margin-bottom:4px;">경매방 만들기</h2>
-    <p class="muted" style="margin-bottom:18px;">학생 예산과 경매에 올릴 가치 목록을 정하세요.</p>
-
-    <div class="card stack">
-      <div class="row">
-        <div style="flex:1; min-width:130px;">
-          <label class="field-label">학생 1인당 시작 예산</label>
-          <input type="number" id="budgetInput" value="${state.draftBudget}" min="0">
-        </div>
-        <div style="flex:1; min-width:130px;">
-          <label class="field-label">1인당 최대 낙찰 개수</label>
-          <input type="number" id="maxItemsInput" value="${state.draftMaxItems}" min="1">
-        </div>
-        <div style="flex:1; min-width:130px;">
-          <label class="field-label">학생 제안 최대 개수</label>
-          <input type="number" id="maxProposalsInput" value="${state.draftMaxProposals}" min="0">
-        </div>
-      </div>
-    </div>
-
-    <div style="margin-top:22px;" class="stack">
-      <div class="row" style="justify-content:space-between; align-items:center;">
-        <h3 style="font-size:16px;">경매 가치 목록 (${state.draftItems.length}개)</h3>
-        <button class="btn secondary small" id="resetDefaultsBtn">기본 목록으로 재설정</button>
-      </div>
-      <div id="itemsList" class="stack">${itemsHtml}</div>
-      <button class="btn secondary block" id="addItemBtn">+ 가치 항목 추가</button>
-    </div>
-
-    <button class="btn gold block" id="createRoomBtn" style="margin-top:24px; font-size:16px; padding:15px;">경매방 만들기</button>
-    `;
-  }
-
-  function renderTeacherRoom(){
-    const r = state.room;
-    if(!r) return `<div class="center muted" style="padding:60px 0;">방 연결 중…</div>`;
-    if(r.status==='waiting') return renderTeacherWaiting(r);
-    if(r.status==='auction') return renderTeacherAuction(r);
-    return renderTeacherEnded(r);
-  }
-
-  function renderTeacherWaiting(r){
-    const studentsHtml = state.students.length
-      ? state.students.map(s=>`<li class="participant"><span>${esc(s.name)}</span><span class="pill">예산 ${s.remainingBudget}</span></li>`).join('')
-      : `<li class="muted" style="list-style:none;">아직 참여한 학생이 없어요.</li>`;
-
-    const pending = state.proposals.filter(p=>p.status==='pending');
-    const proposalsHtml = pending.length
-      ? pending.map(p=>`
-        <div class="proposal-card">
-          <div class="proposal-head"><strong>${esc(p.valueName)}</strong><span class="pill wait">${esc(p.studentName)} 제안</span></div>
-          <p class="muted" style="margin:4px 0 8px;">${esc(p.desc || '(설명 없음)')}</p>
-          <div class="row">
-            <button class="btn small gold" data-approve="${p.id}">목록에 추가</button>
-            <button class="btn small secondary" data-reject="${p.id}">거절</button>
-          </div>
-        </div>
-      `).join('')
-      : `<p class="muted">아직 들어온 제안이 없어요.</p>`;
-
-    const itemsHtml = r.items.map((it,i)=>`<li class="muted" style="list-style:none; padding:4px 0;">${i+1}. <strong style="color:var(--ink)">${esc(it.name)}</strong> · 시작가 ${it.price}</li>`).join('');
-
-    return `
-    <div class="topbar"><span class="eyebrow">대기실</span><button class="linkbtn" data-go="home">방 나가기</button></div>
-    <div class="center" style="margin-bottom:18px;">
-      <p class="eyebrow">방 코드</p>
-      <div class="badge">${r.code}</div>
-      <p class="muted" style="margin-top:10px;">학생들에게 이 코드를 알려주세요</p>
-    </div>
-
-    <div class="card" style="margin-bottom:16px;">
-      <h3 style="font-size:15px; margin-bottom:10px;">참여 학생 (${state.students.length}명)</h3>
-      <ul class="list-plain">${studentsHtml}</ul>
-    </div>
-
-    <div class="card" style="margin-bottom:16px;">
-      <h3 style="font-size:15px; margin-bottom:10px;">학생 제안 (${state.proposals.length}/${r.maxProposals})</h3>
-      <div class="stack">${proposalsHtml}</div>
-    </div>
-
-    <div class="card">
-      <h3 style="font-size:15px; margin-bottom:8px;">경매 목록 (${r.items.length}개)</h3>
-      <ul style="padding:0; margin:0;">${itemsHtml}</ul>
-    </div>
-
-    <button class="btn seal block" id="startAuctionBtn" style="margin-top:22px; padding:15px; font-size:16px;">경매 시작하기</button>
-    `;
-  }
-
-  function renderTeacherAuction(r){
-    const idx = r.currentIndex;
-    const item = r.items[idx];
-    const b = state.bid;
-    const status = b ? b.status : 'open';
-    const historyHtml = (b && b.history && b.history.length)
-      ? b.history.slice().reverse().slice(0,8).map(h=>`<div class="history-row"><span>${esc(h.name)}</span><span>${h.amount}</span></div>`).join('')
-      : `<p class="muted" style="font-size:13px;">입찰 기록이 없습니다.</p>`;
-
-    manageCountdownTicker(status, b);
-
-    return `
-    <div class="topbar">
-      <span class="eyebrow">경매 진행 · 방 ${r.code}</span>
-      <span class="pill">${idx+1} / ${r.items.length}</span>
-    </div>
-
-    <div class="auction-stage">
-      <p class="eyebrow">지금 경매 중인 가치</p>
-      <div class="value-name">${esc(item.name)}</div>
-      <div class="value-desc">${esc(item.desc)}</div>
-      <div id="bidAreaDiv">${renderBidArea(b, item, status)}</div>
-      <div class="row" style="justify-content:center;">${renderTeacherControls(b, status)}</div>
-    </div>
-
-    <div class="card" style="margin-top:16px;">
-      <h3 style="font-size:14px; margin-bottom:6px;">입찰 기록</h3>
-      <div>${historyHtml}</div>
-    </div>
-
-    <button class="btn secondary block" id="nextItemBtn" style="margin-top:18px;">다음 가치로 넘어가기 →</button>
-    `;
-  }
-
-  function renderBidArea(b, item, status){
-    if(status==='countdown'){
-      return `
-        <div class="bid-display" style="justify-content:center;">
-          <div class="center" style="width:100%;">
-            <div style="font-size:12px; opacity:.8;">낙찰자 발표까지</div>
-            <div class="amt" id="countdownNum" style="font-size:46px;">5</div>
-          </div>
-        </div>
-      `;
-    }
-    if(status==='sold'){
-      return `
-        <div class="bid-display" style="background:var(--seal); justify-content:center;">
-          <div class="center" style="width:100%;">
-            <div style="font-size:12px; opacity:.85;">낙찰</div>
-            <div class="amt" style="color:#fff1ec;">${esc(b.soldName || '')}</div>
-            <div class="who" style="opacity:.9;">${b.soldPrice != null ? b.soldPrice + 'P' : ''}</div>
-          </div>
-        </div>
-      `;
-    }
-    const highBid = b ? b.highBid : item.price;
-    const who = b && b.highBidderName ? b.highBidderName : '입찰 없음';
-    return `
-      <div class="bid-display">
-        <div>
-          <div style="font-size:12px; opacity:.75;">현재 최고가</div>
-          <div class="amt">${highBid}</div>
-        </div>
-        <div class="who">${esc(who)}</div>
-      </div>
-    `;
-  }
-
-  function renderTeacherControls(b, status){
-    if(status==='countdown' || status==='sold') return '';
-    return `
-      <button class="btn gold" id="finalizeBtn" ${!(b && b.highBidderId)?'disabled':''}>낙찰 대기</button>
-      <button class="btn secondary" id="skipBtn">유찰(패스)</button>
-    `;
-  }
-
-  function renderTeacherEnded(r){
-    let rows = '';
-    let soldCount = 0, totalSpent = 0;
-    state.students.forEach(s=>{
-      if(s.won && s.won.length){
-        s.won.forEach(w=>{
-          rows += `<tr><td>${esc(s.name)}</td><td>${esc(w.name)}</td><td>${w.price}</td><td>${s.remainingBudget}</td></tr>`;
-          soldCount++; totalSpent += w.price;
-        });
-      } else {
-        rows += `<tr><td>${esc(s.name)}</td><td class="muted">낙찰 없음</td><td>—</td><td>${s.remainingBudget}</td></tr>`;
-      }
-    });
-
-    return `
-    <div class="topbar"><span class="eyebrow">경매 종료 · 방 ${r.code}</span><button class="linkbtn" data-go="home">처음으로</button></div>
-    <div class="celebrate-wrap">
-      <h2>수고 많았어요! 🎉</h2>
-      <p>모든 경매가 종료되었습니다.</p>
-    </div>
-
-    <div class="stat-row">
-      <div class="stat-box"><div class="num">${state.students.length}</div><div class="lbl">참여 학생</div></div>
-      <div class="stat-box"><div class="num">${soldCount}</div><div class="lbl">낙찰 건수</div></div>
-      <div class="stat-box"><div class="num">${totalSpent}</div><div class="lbl">총 낙찰액</div></div>
-    </div>
-
-    <div class="card">
-      <table class="results">
-        <thead><tr><th>학생</th><th>낙찰 가치</th><th>낙찰가</th><th>남은 예산</th></tr></thead>
-        <tbody>${rows || '<tr><td colspan="4" class="muted">기록이 없습니다.</td></tr>'}</tbody>
-      </table>
-    </div>
-
-    <div class="card" style="margin-top:18px;">
-      <h3 style="font-size:15px; margin-bottom:8px;">구글 시트로 보내기</h3>
-      <input type="text" id="webhookInput" placeholder="Apps Script 웹앱 URL (https://script.google.com/...)" value="${esc(state.webhookUrl)}">
-      <button class="btn gold block" id="sendSheetBtn" style="margin-top:10px;">시트로 전송</button>
-    </div>
-    `;
-  }
-
-  function renderStudentJoin(){
-    return `
-    <div class="topbar"><button class="linkbtn" data-go="home">← 처음으로</button></div>
-    <h2 style="margin-bottom:4px;">학생으로 참여하기</h2>
-    <p class="muted" style="margin-bottom:18px;">선생님이 알려주신 방 코드와 이름을 입력하세요.</p>
-
-    <div class="card stack">
-      <div>
-        <label class="field-label">방 코드</label>
-        <input type="text" id="joinCode" inputmode="numeric" maxlength="4" placeholder="예: 4821">
-      </div>
-      <div>
-        <label class="field-label">이름</label>
-        <input type="text" id="joinName" placeholder="이름을 입력하세요" maxlength="12">
-      </div>
-      <button class="btn gold block" id="joinBtn" style="padding:14px;">입장하기</button>
-      <p class="muted" id="joinError" style="color:var(--seal); display:none;"></p>
-    </div>
-    `;
-  }
-
-  function renderStudentRoom(){
-    const r = state.room;
-    if(!r) return `<div class="center muted" style="padding:60px 0;">대기실 입장 중…</div>`;
-    if(r.status==='waiting') return renderStudentWaiting(r);
-    if(r.status==='auction') return renderStudentAuction(r);
-    return renderStudentEnded(r);
-  }
-
-  function myStudent(){
-    return state.students.find(s=>s.id===state.studentId);
-  }
-
-  function renderStudentWaiting(r){
-    const me = myStudent();
-    const budget = me ? me.remainingBudget : r.budget;
-    const myProposals = state.proposals.filter(p=>p.studentId===state.studentId);
-    const myPropHtml = myProposals.length
-      ? myProposals.map(p=>`<div class="proposal-card"><div class="proposal-head"><strong>${esc(p.valueName)}</strong><span class="pill ${p.status==='approved'?'ok':p.status==='rejected'?'no':'wait'}">${p.status==='approved'?'채택됨':p.status==='rejected'?'거절됨':'대기중'}</span></div></div>`).join('')
-      : `<p class="muted" style="font-size:13px;">아직 제안한 가치가 없어요.</p>`;
-
-    return `
-    <div class="topbar"><span class="eyebrow">대기실 · 방 ${r.code}</span><span class="pill">${esc(state.studentName)}</span></div>
-    <div class="budget-strip"><span>내 예산</span><b>${budget}</b></div>
-
-    <div class="card center" style="padding:26px 20px;">
-      <p class="eyebrow">선생님이 경매를 시작하면</p>
-      <h3 style="font-size:17px;">자동으로 경매 화면으로 이동합니다</h3>
-    </div>
-
-    <div class="card" style="margin-top:16px;">
-      <h3 style="font-size:15px; margin-bottom:4px;">추가하고 싶은 가치가 있나요?</h3>
-      <div class="stack" style="margin-top:10px;">
-        <input type="text" id="proposeValueName" placeholder="가치 이름">
-        <textarea id="proposeValueDesc" placeholder="설명" style="min-height:56px;"></textarea>
-        <button class="btn secondary block" id="proposeBtn">제안하기</button>
-      </div>
-    </div>
-
-    <div class="card" style="margin-top:16px;">
-      <h3 style="font-size:15px; margin-bottom:8px;">내가 제안한 가치</h3>
-      <div class="stack">${myPropHtml}</div>
-    </div>
-    `;
-  }
-
-  function renderStudentAuction(r){
-    const idx = r.currentIndex;
-    const item = r.items[idx];
-    const b = state.bid;
-    const status = b ? b.status : 'open';
-    const me = myStudent();
-    const budget = me ? me.remainingBudget : 0;
-
-    manageCountdownTicker(status, b);
-
-    return `
-    <div class="topbar"><span class="eyebrow">경매 중 · ${idx+1}/${r.items.length}</span><span class="pill">${esc(state.studentName)}</span></div>
-    <div class="budget-strip"><span>내 남은 예산</span><b>${budget}</b></div>
-
-    <div class="auction-stage">
-      <p class="eyebrow">지금 경매 중인 가치</p>
-      <div class="value-name">${esc(item.name)}</div>
-      <div class="value-desc">${esc(item.desc)}</div>
-      <div id="bidAreaDiv">${renderBidArea(b, item, status)}</div>
-      <div>${renderStudentBidControls(r, b, item, status, me)}</div>
-    </div>
-
-    <div class="card" style="margin-top:16px;">
-      <h3 style="font-size:14px; margin-bottom:6px;">내가 얻은 가치</h3>
-      <div>${renderMyWon(me)}</div>
-    </div>
-    `;
-  }
-
-  function renderStudentBidControls(r, b, item, status, me){
-    const maxItems = r.maxItems || 3;
-    if(me && me.won && me.won.length >= maxItems) return `<p class="muted center">최대 낙찰 개수에 도달했습니다.</p>`;
-    if(status==='countdown') return `<p class="muted center">입찰이 마감되었습니다.</p>`;
-    if(status==='sold') return `<p class="muted center">낙찰되었습니다.</p>`;
-    const highBid = b ? b.highBid : item.price;
-    return `
-      <div class="stack" style="max-width:280px; margin:0 auto;">
-        <input type="number" id="bidAmountInput" value="${highBid + 10}" min="${highBid+1}" max="${me ? me.remainingBudget : 0}">
-        <div class="bid-quick">
-          <button class="btn small secondary" data-quick="10">+10</button>
-          <button class="btn small secondary" data-quick="50">+50</button>
-          <button class="btn small secondary" data-quick="100">+100</button>
-        </div>
-        <button class="btn gold block" id="placeBidBtn">입찰하기</button>
-        <p class="muted" id="bidError" style="color:var(--seal); display:none; font-size:12.5px;"></p>
-      </div>
-    `;
-  }
-
-  function renderMyWon(me){
-    if(!me || !me.won || !me.won.length) return `<p class="muted" style="font-size:13px;">아직 낙찰받은 가치가 없어요.</p>`;
-    return `<ul class="list-plain">${me.won.map(w=>`<li class="participant"><span>${esc(w.name)}</span><span class="pill">${w.price}</span></li>`).join('')}</ul>`;
-  }
-
-  function renderStudentEnded(r){
-    const me = myStudent();
-    return `
-    <div class="topbar"><span class="eyebrow">경매 종료 · 방 ${r.code}</span></div>
-    <div class="celebrate-wrap"><h2>수고했어요, ${esc(state.studentName)}님! 🎉</h2></div>
-    <div class="card">
-      <div class="budget-strip" style="margin-bottom:14px;"><span>남은 예산</span><b>${me ? me.remainingBudget : '-'}</b></div>
-      ${renderMyWon(me)}
-    </div>
-    `;
-  }
-
-  /* ================= HANDLERS ================= */
-  function attachHandlers(){
-    document.querySelectorAll('[data-go]').forEach(el=>{
-      el.onclick = () => goto(el.getAttribute('data-go'));
-    });
-
-    const addItemBtn = document.getElementById('addItemBtn');
-    if(addItemBtn) addItemBtn.onclick = () => {
-      state.draftItems.push({id:uid(), name:'', desc:'', price:50});
-      render();
-    };
-
-    const resetBtn = document.getElementById('resetDefaultsBtn');
-    if(resetBtn) resetBtn.onclick = () => {
-      state.draftItems = DEFAULT_VALUES.map(v=>({id:uid(), ...v}));
-      render();
-    };
-
-    document.querySelectorAll('[data-remove-item]').forEach(el=>{
-      el.onclick = () => {
-        state.draftItems = state.draftItems.filter(it=>it.id !== el.getAttribute('data-remove-item'));
-        render();
-      };
-    });
-
-    const createRoomBtn = document.getElementById('createRoomBtn');
-    if(createRoomBtn) createRoomBtn.onclick = async () => {
-      createRoomBtn.disabled = true;
-      const code = roomCodeGen();
-      const budget = parseInt(document.getElementById('budgetInput').value,10) || 1000;
-      const maxItems = parseInt(document.getElementById('maxItemsInput').value,10) || 3;
-      const maxProposals = parseInt(document.getElementById('maxProposalsInput').value,10) || 10;
-      
-      const room = { code, status:'waiting', budget, maxProposals, maxItems, items: state.draftItems, currentIndex:-1, createdAt:Date.now() };
-      await db.collection("rooms").doc(code).set(room);
-      state.roomCode = code;
-      state.role = 'teacher';
-      bindRoomRealtime(code);
-      goto('teacher-room');
-    };
-
-    // 제안 승인
-    document.querySelectorAll('[data-approve]').forEach(el=>{
-      el.onclick = async () => {
-        const pid = el.getAttribute('data-approve');
-        const p = state.proposals.find(x=>x.id===pid);
-        if(!p) return;
-        await db.collection("rooms").doc(state.roomCode).collection("proposals").doc(pid).update({ status:'approved' });
-        const newItems = [...state.room.items, {id:uid(), name:p.valueName, desc:p.desc||'', price:50}];
-        await db.collection("rooms").doc(state.roomCode).update({ items: newItems });
-        toast('가치 목록에 추가했어요.');
-      };
-    });
-
-    // 제안 거절
-    document.querySelectorAll('[data-reject]').forEach(el=>{
-      el.onclick = async () => {
-        const pid = el.getAttribute('data-reject');
-        await db.collection("rooms").doc(state.roomCode).collection("proposals").doc(pid).update({ status:'rejected' });
-      };
-    });
-
-    const startAuctionBtn = document.getElementById('startAuctionBtn');
-    if(startAuctionBtn) startAuctionBtn.onclick = async () => {
-      await db.collection("rooms").doc(state.roomCode).update({ status:'auction', currentIndex:0 });
-      await db.collection("rooms").doc(state.roomCode).collection("bids").doc("0").set({
-        itemIndex:0, highBid:state.room.items[0].price, highBidderId:null, highBidderName:null, history:[], status:'open', countdownEndAt:null, soldName:null, soldPrice:null
-      });
-      bindBidRealtime(state.roomCode, 0);
-    };
-
-    const finalizeBtn = document.getElementById('finalizeBtn');
-    if(finalizeBtn) finalizeBtn.onclick = async () => {
-      const idx = state.room.currentIndex;
-      const b = state.bid;
-      if(!b || !b.highBidderId) return;
-      
-      await db.collection("rooms").doc(state.roomCode).collection("bids").doc(String(idx)).update({
-        status: 'countdown',
-        countdownEndAt: Date.now() + 5000
-      });
-
-      setTimeout(async () => {
-        const studentRef = db.collection("rooms").doc(state.roomCode).collection("students").doc(b.highBidderId);
-        const sSnap = await studentRef.get();
-        if(sSnap.exists){
-          const s = sSnap.data();
-          const item = state.room.items[idx];
-          const newWon = s.won || [];
-          newWon.push({itemId:item.id, name:item.name, price:b.highBid});
-          await studentRef.update({
-            remainingBudget: s.remainingBudget - b.highBid,
-            won: newWon
-          });
-          await db.collection("rooms").doc(state.roomCode).collection("bids").doc(String(idx)).update({
-            status: 'sold',
-            soldName: s.name,
-            soldPrice: b.highBid
-          });
+      if(state.countdownHandle) return;
+      const tick = () => {
+        const el = document.getElementById('countdownNum');
+        if(!el || !state.bid || state.bid.status !== 'countdown'){
+          clearInterval(state.countdownHandle); state.countdownHandle=null; return;
         }
-      }, 5200);
-    };
-
-    const skipBtn = document.getElementById('skipBtn');
-    if(skipBtn) skipBtn.onclick = async () => {
-      const nextIdx = state.room.currentIndex + 1;
-      if(nextIdx >= state.room.items.length){
-        await db.collection("rooms").doc(state.roomCode).update({ status:'ended' });
-      } else {
-        await db.collection("rooms").doc(state.roomCode).update({ currentIndex: nextIdx });
-        await db.collection("rooms").doc(state.roomCode).collection("bids").doc(String(nextIdx)).set({
-          itemIndex:nextIdx, highBid:state.room.items[nextIdx].price, highBidderId:null, highBidderName:null, history:[], status:'open', countdownEndAt:null, soldName:null, soldPrice:null
-        });
-        bindBidRealtime(state.roomCode, nextIdx);
-      }
-    };
-
-    const nextItemBtn = document.getElementById('nextItemBtn');
-    if(nextItemBtn) nextItemBtn.onclick = async () => {
-      const nextIdx = state.room.currentIndex + 1;
-      if(nextIdx >= state.room.items.length){
-        await db.collection("rooms").doc(state.roomCode).update({ status:'ended' });
-      } else {
-        await db.collection("rooms").doc(state.roomCode).update({ currentIndex: nextIdx });
-        await db.collection("rooms").doc(state.roomCode).collection("bids").doc(String(nextIdx)).set({
-          itemIndex:nextIdx, highBid:state.room.items[nextIdx].price, highBidderId:null, highBidderName:null, history:[], status:'open', countdownEndAt:null, soldName:null, soldPrice:null
-        });
-        bindBidRealtime(state.roomCode, nextIdx);
-      }
-    };
-
-    const joinBtn = document.getElementById('joinBtn');
-    if(joinBtn) joinBtn.onclick = async () => {
-      const code = document.getElementById('joinCode').value.trim();
-      const name = document.getElementById('joinName').value.trim();
-      const errEl = document.getElementById('joinError');
-      if(!code || !name){ errEl.textContent='방 코드와 이름을 모두 입력해주세요.'; errEl.style.display='block'; return; }
-      
-      const rSnap = await db.collection("rooms").doc(code).get();
-      if(!rSnap.exists){
-        errEl.textContent='존재하지 않는 방입니다.'; errEl.style.display='block'; return;
-      }
-      const r = rSnap.data();
-      const sid = uid();
-      const student = {id:sid, name, budget:r.budget, remainingBudget:r.budget, won:[], joinedAt:Date.now()};
-      await db.collection("rooms").doc(code).collection("students").doc(sid).set(student);
-
-      state.roomCode = code;
-      state.studentId = sid;
-      state.studentName = name;
-      state.role = 'student';
-      bindRoomRealtime(code);
-      if(r.status==='auction') bindBidRealtime(code, r.currentIndex);
-      goto('student-room');
-    };
-
-    const proposeBtn = document.getElementById('proposeBtn');
-    if(proposeBtn) proposeBtn.onclick = async () => {
-      const nameEl = document.getElementById('proposeValueName');
-      const descEl = document.getElementById('proposeValueDesc');
-      const vname = nameEl.value.trim();
-      if(!vname){ toast('가치 이름을 입력해주세요.'); return; }
-      const pid = uid();
-      const p = {id:pid, studentId:state.studentId, studentName:state.studentName, valueName:vname, desc:descEl.value.trim(), status:'pending', createdAt:Date.now()};
-      await db.collection("rooms").doc(state.roomCode).collection("proposals").doc(pid).set(p);
-      toast('선생님께 제안을 보냈어요.');
-      nameEl.value = '';
-      descEl.value = '';
-    };
-
-    const placeBidBtn = document.getElementById('placeBidBtn');
-    if(placeBidBtn) placeBidBtn.onclick = async () => {
-      const amount = parseInt(document.getElementById('bidAmountInput').value,10);
-      const idx = state.room.currentIndex;
-      const b = state.bid;
-      const me = myStudent();
-      const errEl = document.getElementById('bidError');
-
-      if(!amount || (b && amount <= b.highBid)){
-        errEl.textContent = '현재 최고가보다 높아야 합니다.'; errEl.style.display='block'; return;
-      }
-      if(me && amount > me.remainingBudget){
-        errEl.textContent = '남은 예산보다 많습니다.'; errEl.style.display='block'; return;
-      }
-
-      const history = b && b.history ? b.history : [];
-      history.push({studentId:state.studentId, name:state.studentName, amount, ts:Date.now()});
-
-      await db.collection("rooms").doc(state.roomCode).collection("bids").doc(String(idx)).update({
-        highBid: amount,
-        highBidderId: state.studentId,
-        highBidderName: state.studentName,
-        history: history
-      });
-      toast('입찰을 완료했습니다!');
-    };
-
-    document.querySelectorAll('[data-quick]').forEach(el=>{
-      el.onclick = () => {
-        const inc = parseInt(el.getAttribute('data-quick'),10);
-        const input = document.getElementById('bidAmountInput');
-        const base = state.bid ? state.bid.highBid : state.room.items[state.room.currentIndex].price;
-        input.value = base + inc;
+        const remainingMs = (state.bid.countdownEndAt || 0) - Date.now();
+        const secs = Math.max(0, Math.ceil(remainingMs/1000));
+        el.textContent = secs;
       };
-    });
+      tick();
+      state.countdownHandle = setInterval(tick, 200);
+    }
 
-    const sendSheetBtn = document.getElementById('sendSheetBtn');
-    if(sendSheetBtn) sendSheetBtn.onclick = async () => {
-      const url = document.getElementById('webhookInput').value.trim();
-      if(!url){ toast('웹앱 URL을 입력해주세요.'); return; }
-      sendSheetBtn.disabled = true; sendSheetBtn.textContent = '전송 중…';
-      const results = [];
+    /* ================= REALTIME SYNC ================= */
+    function bindRoomRealtime(code){
+      const unsubRoom = db.collection("rooms").doc(code).onSnapshot((snap) => {
+        if(!snap.exists) return;
+        state.room = snap.data();
+        render();
+      });
+      state.unsubscribers.push(unsubRoom);
+
+      const unsubStudents = db.collection("rooms").doc(code).collection("students").orderBy("joinedAt", "asc").onSnapshot((snap) => {
+        state.students = snap.docs.map(d => d.data());
+        render();
+      });
+      state.unsubscribers.push(unsubStudents);
+
+      const unsubProposals = db.collection("rooms").doc(code).collection("proposals").orderBy("createdAt", "asc").onSnapshot((snap) => {
+        state.proposals = snap.docs.map(d => d.data());
+        render();
+      });
+      state.unsubscribers.push(unsubProposals);
+    }
+
+    function bindBidRealtime(code, idx){
+      const unsubBid = db.collection("rooms").doc(code).collection("bids").doc(String(idx)).onSnapshot((snap) => {
+        state.bid = snap.exists ? snap.data() : null;
+        render();
+      });
+      state.unsubscribers.push(unsubBid);
+    }
+
+    /* ================= RENDER ================= */
+    function render(){
+      const appEl = document.getElementById('app');
+      if(!appEl) return;
+      if(state.screen==='home') appEl.innerHTML = renderHome();
+      else if(state.screen==='teacher-create') appEl.innerHTML = renderTeacherCreate();
+      else if(state.screen==='teacher-room') appEl.innerHTML = renderTeacherRoom();
+      else if(state.screen==='student-join') appEl.innerHTML = renderStudentJoin();
+      else if(state.screen==='student-room') appEl.innerHTML = renderStudentRoom();
+      attachHandlers();
+    }
+
+    function renderHome(){
+      return `
+      <div class="home-hero">
+        <p class="eyebrow">도덕 수업 · 인권 가치 경매</p>
+        <h1>가치 경매</h1>
+        <p>한정된 예산으로 인권 가치를 두고 경합합니다.<br>무엇에 얼마의 값을 매길 것인가, 그 선택이 곧 우리의 가치관입니다.</p>
+      </div>
+      <div class="stack" style="margin-top:26px;">
+        <div class="choice-card" data-go="teacher-create">
+          <h3>선생님으로 시작하기</h3>
+          <p>경매방을 만들고 진행합니다. 가치 목록 설정, 실시간 입찰 진행, 결과를 구글 시트로 정리할 수 있어요.</p>
+        </div>
+        <div class="choice-card" data-go="student-join">
+          <h3>학생으로 참여하기</h3>
+          <p>선생님이 알려준 방 코드로 입장해 예산 안에서 원하는 가치에 입찰합니다.</p>
+        </div>
+      </div>
+      <p class="footer-note">각 기기(학생 개인 스마트폰·태블릿)에서 이 화면을 열어 참여하세요.</p>
+      `;
+    }
+
+    function renderTeacherCreate(){
+      const itemsHtml = state.draftItems.map((it, i)=>`
+        <div class="item-row" data-item-id="${it.id}">
+          <div class="item-num">${i+1}</div>
+          <div class="item-fields">
+            <input type="text" class="it-name" placeholder="가치 이름" value="${esc(it.name)}">
+            <textarea class="it-desc" placeholder="설명">${esc(it.desc)}</textarea>
+            <input type="number" class="it-price" placeholder="시작가" value="${it.price}" min="0">
+          </div>
+          <button class="remove-x" data-remove-item="${it.id}" title="삭제">✕</button>
+        </div>
+      `).join('');
+
+      return `
+      <div class="topbar"><button class="linkbtn" data-go="home">← 처음으로</button></div>
+      <h2 style="margin-bottom:4px;">경매방 만들기</h2>
+      <p class="muted" style="margin-bottom:18px;">학생 예산과 경매에 올릴 가치 목록을 정하세요.</p>
+
+      <div class="card stack">
+        <div class="row">
+          <div style="flex:1; min-width:130px;">
+            <label class="field-label">학생 1인당 시작 예산</label>
+            <input type="number" id="budgetInput" value="${state.draftBudget}" min="0">
+          </div>
+          <div style="flex:1; min-width:130px;">
+            <label class="field-label">1인당 최대 낙찰 개수</label>
+            <input type="number" id="maxItemsInput" value="${state.draftMaxItems}" min="1">
+          </div>
+          <div style="flex:1; min-width:130px;">
+            <label class="field-label">학생 제안 최대 개수</label>
+            <input type="number" id="maxProposalsInput" value="${state.draftMaxProposals}" min="0">
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:22px;" class="stack">
+        <div class="row" style="justify-content:space-between; align-items:center;">
+          <h3 style="font-size:16px;">경매 가치 목록 (${state.draftItems.length}개)</h3>
+          <button class="btn secondary small" id="resetDefaultsBtn">기본 목록으로 재설정</button>
+        </div>
+        <div id="itemsList" class="stack">${itemsHtml}</div>
+        <button class="btn secondary block" id="addItemBtn">+ 가치 항목 추가</button>
+      </div>
+
+      <button class="btn gold block" id="createRoomBtn" style="margin-top:24px; font-size:16px; padding:15px;">경매방 만들기</button>
+      `;
+    }
+
+    function renderTeacherRoom(){
+      const r = state.room;
+      if(!r) return `<div class="center muted" style="padding:60px 0;">방 연결 중…</div>`;
+      if(r.status==='waiting') return renderTeacherWaiting(r);
+      if(r.status==='auction') return renderTeacherAuction(r);
+      return renderTeacherEnded(r);
+    }
+
+    function renderTeacherWaiting(r){
+      const studentsHtml = state.students.length
+        ? state.students.map(s=>`<li class="participant"><span>${esc(s.name)}</span><span class="pill">예산 ${s.remainingBudget}</span></li>`).join('')
+        : `<li class="muted" style="list-style:none;">아직 참여한 학생이 없어요.</li>`;
+
+      const pending = state.proposals.filter(p=>p.status==='pending');
+      const proposalsHtml = pending.length
+        ? pending.map(p=>`
+          <div class="proposal-card">
+            <div class="proposal-head"><strong>${esc(p.valueName)}</strong><span class="pill wait">${esc(p.studentName)} 제안</span></div>
+            <p class="muted" style="margin:4px 0 8px;">${esc(p.desc || '(설명 없음)')}</p>
+            <div class="row">
+              <button class="btn small gold" data-approve="${p.id}">목록에 추가</button>
+              <button class="btn small secondary" data-reject="${p.id}">거절</button>
+            </div>
+          </div>
+        `).join('')
+        : `<p class="muted">아직 들어온 제안이 없어요.</p>`;
+
+      const itemsHtml = r.items.map((it,i)=>`<li class="muted" style="list-style:none; padding:4px 0;">${i+1}. <strong style="color:var(--ink)">${esc(it.name)}</strong> · 시작가 ${it.price}</li>`).join('');
+
+      return `
+      <div class="topbar"><span class="eyebrow">대기실</span><button class="linkbtn" data-go="home">방 나가기</button></div>
+      <div class="center" style="margin-bottom:18px;">
+        <p class="eyebrow">방 코드</p>
+        <div class="badge">${r.code}</div>
+        <p class="muted" style="margin-top:10px;">학생들에게 이 코드를 알려주세요</p>
+      </div>
+
+      <div class="card" style="margin-bottom:16px;">
+        <h3 style="font-size:15px; margin-bottom:10px;">참여 학생 (${state.students.length}명)</h3>
+        <ul class="list-plain">${studentsHtml}</ul>
+      </div>
+
+      <div class="card" style="margin-bottom:16px;">
+        <h3 style="font-size:15px; margin-bottom:10px;">학생 제안 (${state.proposals.length}/${r.maxProposals})</h3>
+        <div class="stack">${proposalsHtml}</div>
+      </div>
+
+      <div class="card">
+        <h3 style="font-size:15px; margin-bottom:8px;">경매 목록 (${r.items.length}개)</h3>
+        <ul style="padding:0; margin:0;">${itemsHtml}</ul>
+      </div>
+
+      <button class="btn seal block" id="startAuctionBtn" style="margin-top:22px; padding:15px; font-size:16px;">경매 시작하기</button>
+      `;
+    }
+
+    function renderTeacherAuction(r){
+      const idx = r.currentIndex;
+      const item = r.items[idx];
+      const b = state.bid;
+      const status = b ? b.status : 'open';
+      const historyHtml = (b && b.history && b.history.length)
+        ? b.history.slice().reverse().slice(0,8).map(h=>`<div class="history-row"><span>${esc(h.name)}</span><span>${h.amount}</span></div>`).join('')
+        : `<p class="muted" style="font-size:13px;">입찰 기록이 없습니다.</p>`;
+
+      manageCountdownTicker(status, b);
+
+      return `
+      <div class="topbar">
+        <span class="eyebrow">경매 진행 · 방 ${r.code}</span>
+        <span class="pill">${idx+1} / ${r.items.length}</span>
+      </div>
+
+      <div class="auction-stage">
+        <p class="eyebrow">지금 경매 중인 가치</p>
+        <div class="value-name">${esc(item.name)}</div>
+        <div class="value-desc">${esc(item.desc)}</div>
+        <div id="bidAreaDiv">${renderBidArea(b, item, status)}</div>
+        <div class="row" style="justify-content:center;">${renderTeacherControls(b, status)}</div>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <h3 style="font-size:14px; margin-bottom:6px;">입찰 기록</h3>
+        <div>${historyHtml}</div>
+      </div>
+
+      <button class="btn secondary block" id="nextItemBtn" style="margin-top:18px;">다음 가치로 넘어가기 →</button>
+      `;
+    }
+
+    function renderBidArea(b, item, status){
+      if(status==='countdown'){
+        return `
+          <div class="bid-display" style="justify-content:center;">
+            <div class="center" style="width:100%;">
+              <div style="font-size:12px; opacity:.8;">낙찰자 발표까지</div>
+              <div class="amt" id="countdownNum" style="font-size:46px;">5</div>
+            </div>
+          </div>
+        `;
+      }
+      if(status==='sold'){
+        return `
+          <div class="bid-display" style="background:var(--seal); justify-content:center;">
+            <div class="center" style="width:100%;">
+              <div style="font-size:12px; opacity:.85;">낙찰</div>
+              <div class="amt" style="color:#fff1ec;">${esc(b.soldName || '')}</div>
+              <div class="who" style="opacity:.9;">${b.soldPrice != null ? b.soldPrice + 'P' : ''}</div>
+            </div>
+          </div>
+        `;
+      }
+      const highBid = b ? b.highBid : item.price;
+      const who = b && b.highBidderName ? b.highBidderName : '입찰 없음';
+      return `
+        <div class="bid-display">
+          <div>
+            <div style="font-size:12px; opacity:.75;">현재 최고가</div>
+            <div class="amt">${highBid}</div>
+          </div>
+          <div class="who">${esc(who)}</div>
+        </div>
+      `;
+    }
+
+    function renderTeacherControls(b, status){
+      if(status==='countdown' || status==='sold') return '';
+      return `
+        <button class="btn gold" id="finalizeBtn" ${!(b && b.highBidderId)?'disabled':''}>낙찰 대기</button>
+        <button class="btn secondary" id="skipBtn">유찰(패스)</button>
+      `;
+    }
+
+    function renderTeacherEnded(r){
+      let rows = '';
+      let soldCount = 0, totalSpent = 0;
       state.students.forEach(s=>{
         if(s.won && s.won.length){
-          s.won.forEach(w=> results.push({studentName:s.name, valueName:w.name, price:w.price, remainingBudget:s.remainingBudget}));
+          s.won.forEach(w=>{
+            rows += `<tr><td>${esc(s.name)}</td><td>${esc(w.name)}</td><td>${w.price}</td><td>${s.remainingBudget}</td></tr>`;
+            soldCount++; totalSpent += w.price;
+          });
         } else {
-          results.push({studentName:s.name, valueName:'', price:'', remainingBudget:s.remainingBudget});
+          rows += `<tr><td>${esc(s.name)}</td><td class="muted">낙찰 없음</td><td>—</td><td>${s.remainingBudget}</td></tr>`;
         }
       });
-      try{
-        await fetch(url, {
-          method:'POST',
-          headers:{'Content-Type':'text/plain;charset=utf-8'},
-          body: JSON.stringify({roomCode: state.roomCode, timestamp: new Date().toLocaleString('ko-KR'), results})
-        });
-        toast('구글 시트로 전송을 완료했습니다!');
-      }catch(e){
-        toast('전송 실패. URL을 다시 확인해주세요.');
-      }
-      sendSheetBtn.disabled = false; sendSheetBtn.textContent = '시트로 전송';
-    };
-  }
 
-  // 초기 실행
-  render();
+      return `
+      <div class="topbar"><span class="eyebrow">경매 종료 · 방 ${r.code}</span><button class="linkbtn" data-go="home">처음으로</button></div>
+      <div class="celebrate-wrap">
+        <h2>수고 많았어요! 🎉</h2>
+        <p>모든 경매가 종료되었습니다.</p>
+      </div>
+
+      <div class="stat-row">
+        <div class="stat-box"><div class="num">${state.students.length}</div><div class="lbl">참여 학생</div></div>
+        <div class="stat-box"><div class="num">${soldCount}</div><div class="lbl">낙찰 건수</div></div>
+        <div class="stat-box"><div class="num">${totalSpent}</div><div class="lbl">총 낙찰액</div></div>
+      </div>
+
+      <div class="card">
+        <table class="results">
+          <thead><tr><th>학생</th><th>낙찰 가치</th><th>낙찰가</th><th>남은 예산</th></tr></thead>
+          <tbody>${rows || '<tr><td colspan="4" class="muted">기록이 없습니다.</td></tr>'}</tbody>
+        </table>
+      </div>
+
+      <div class="card" style="margin-top:18px;">
+        <h3 style="font-size:15px; margin-bottom:8px;">구글 시트로 보내기</h3>
+        <input type="text" id="webhookInput" placeholder="Apps Script 웹앱 URL (https://script.google.com/...)" value="${esc(state.webhookUrl)}">
+        <button class="btn gold block" id="sendSheetBtn" style="margin-top:10px;">시트로 전송</button>
+      </div>
+      `;
+    }
+
+    function renderStudentJoin(){
+      return `
+      <div class="topbar"><button class="linkbtn" data-go="home">← 처음으로</button></div>
+      <h2 style="margin-bottom:4px;">학생으로 참여하기</h2>
+      <p class="muted" style="margin-bottom:18px;">선생님이 알려주신 방 코드와 이름을 입력하세요.</p>
+
+      <div class="card stack">
+        <div>
+          <label class="field-label">방 코드</label>
+          <input type="text" id="joinCode" inputmode="numeric" maxlength="4" placeholder="예: 4821">
+        </div>
+        <div>
+          <label class="field-label">이름</label>
+          <input type="text" id="joinName" placeholder="이름을 입력하세요" maxlength="12">
+        </div>
+        <button class="btn gold block" id="joinBtn" style="padding:14px;">입장하기</button>
+        <p class="muted" id="joinError" style="color:var(--seal); display:none;"></p>
+      </div>
+      `;
+    }
+
+    function renderStudentRoom(){
+      const r = state.room;
+      if(!r) return `<div class="center muted" style="padding:60px 0;">대기실 입장 중…</div>`;
+      if(r.status==='waiting') return renderStudentWaiting(r);
+      if(r.status==='auction') return renderStudentAuction(r);
+      return renderStudentEnded(r);
+    }
+
+    function myStudent(){
+      return state.students.find(s=>s.id===state.studentId);
+    }
+
+    function renderStudentWaiting(r){
+      const me = myStudent();
+      const budget = me ? me.remainingBudget : r.budget;
+      const myProposals = state.proposals.filter(p=>p.studentId===state.studentId);
+      const myPropHtml = myProposals.length
+        ? myProposals.map(p=>`<div class="proposal-card"><div class="proposal-head"><strong>${esc(p.valueName)}</strong><span class="pill ${p.status==='approved'?'ok':p.status==='rejected'?'no':'wait'}">${p.status==='approved'?'채택됨':p.status==='rejected'?'거절됨':'대기중'}</span></div></div>`).join('')
+        : `<p class="muted" style="font-size:13px;">아직 제안한 가치가 없어요.</p>`;
+
+      return `
+      <div class="topbar"><span class="eyebrow">대기실 · 방 ${r.code}</span><span class="pill">${esc(state.studentName)}</span></div>
+      <div class="budget-strip"><span>내 예산</span><b>${budget}</b></div>
+
+      <div class="card center" style="padding:26px 20px;">
+        <p class="eyebrow">선생님이 경매를 시작하면</p>
+        <h3 style="font-size:17px;">자동으로 경매 화면으로 이동합니다</h3>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <h3 style="font-size:15px; margin-bottom:4px;">추가하고 싶은 가치가 있나요?</h3>
+        <div class="stack" style="margin-top:10px;">
+          <input type="text" id="proposeValueName" placeholder="가치 이름">
+          <textarea id="proposeValueDesc" placeholder="설명" style="min-height:56px;"></textarea>
+          <button class="btn secondary block" id="proposeBtn">제안하기</button>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <h3 style="font-size:15px; margin-bottom:8px;">내가 제안한 가치</h3>
+        <div class="stack">${myPropHtml}</div>
+      </div>
+      `;
+    }
+
+    function renderStudentAuction(r){
+      const idx = r.currentIndex;
+      const item = r.items[idx];
+      const b = state.bid;
+      const status = b ? b.status : 'open';
+      const me = myStudent();
+      const budget = me ? me.remainingBudget : 0;
+
+      manageCountdownTicker(status, b);
+
+      return `
+      <div class="topbar"><span class="eyebrow">경매 중 · ${idx+1}/${r.items.length}</span><span class="pill">${esc(state.studentName)}</span></div>
+      <div class="budget-strip"><span>내 남은 예산</span><b>${budget}</b></div>
+
+      <div class="auction-stage">
+        <p class="eyebrow">지금 경매 중인 가치</p>
+        <div class="value-name">${esc(item.name)}</div>
+        <div class="value-desc">${esc(item.desc)}</div>
+        <div id="bidAreaDiv">${renderBidArea(b, item, status)}</div>
+        <div>${renderStudentBidControls(r, b, item, status, me)}</div>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <h3 style="font-size:14px; margin-bottom:6px;">내가 얻은 가치</h3>
+        <div>${renderMyWon(me)}</div>
+      </div>
+      `;
+    }
+
+    function renderStudentBidControls(r, b, item, status, me){
+      const maxItems = r.maxItems || 3;
+      if(me && me.won && me.won.length >= maxItems) return `<p class="muted center">최대 낙찰 개수에 도달했습니다.</p>`;
+      if(status==='countdown') return `<p class="muted center">입찰이 마감되었습니다.</p>`;
+      if(status==='sold') return `<p class="muted center">낙찰되었습니다.</p>`;
+      const highBid = b ? b.highBid : item.price;
+      return `
+        <div class="stack" style="max-width:280px; margin:0 auto;">
+          <input type="number" id="bidAmountInput" value="${highBid + 10}" min="${highBid+1}" max="${me ? me.remainingBudget : 0}">
+          <div class="bid-quick">
+            <button class="btn small secondary" data-quick="10">+10</button>
+            <button class="btn small secondary" data-quick="50">+50</button>
+            <button class="btn small secondary" data-quick="100">+100</button>
+          </div>
+          <button class="btn gold block" id="placeBidBtn">입찰하기</button>
+          <p class="muted" id="bidError" style="color:var(--seal); display:none; font-size:12.5px;"></p>
+        </div>
+      `;
+    }
+
+    function renderMyWon(me){
+      if(!me || !me.won || !me.won.length) return `<p class="muted" style="font-size:13px;">아직 낙찰받은 가치가 없어요.</p>`;
+      return `<ul class="list-plain">${me.won.map(w=>`<li class="participant"><span>${esc(w.name)}</span><span class="pill">${w.price}</span></li>`).join('')}</ul>`;
+    }
+
+    function renderStudentEnded(r){
+      const me = myStudent();
+      return `
+      <div class="topbar"><span class="eyebrow">경매 종료 · 방 ${r.code}</span></div>
+      <div class="celebrate-wrap"><h2>수고했어요, ${esc(state.studentName)}님! 🎉</h2></div>
+      <div class="card">
+        <div class="budget-strip" style="margin-bottom:14px;"><span>남은 예산</span><b>${me ? me.remainingBudget : '-'}</b></div>
+        ${renderMyWon(me)}
+      </div>
+      `;
+    }
+
+    /* ================= HANDLERS ================= */
+    function attachHandlers(){
+      document.querySelectorAll('[data-go]').forEach(el=>{
+        el.onclick = () => goto(el.getAttribute('data-go'));
+      });
+
+      const addItemBtn = document.getElementById('addItemBtn');
+      if(addItemBtn) addItemBtn.onclick = () => {
+        state.draftItems.push({id:uid(), name:'', desc:'', price:50});
+        render();
+      };
+
+      const resetBtn = document.getElementById('resetDefaultsBtn');
+      if(resetBtn) resetBtn.onclick = () => {
+        state.draftItems = DEFAULT_VALUES.map(v=>({id:uid(), ...v}));
+        render();
+      };
+
+      document.querySelectorAll('[data-remove-item]').forEach(el=>{
+        el.onclick = () => {
+          state.draftItems = state.draftItems.filter(it=>it.id !== el.getAttribute('data-remove-item'));
+          render();
+        };
+      });
+
+      const createRoomBtn = document.getElementById('createRoomBtn');
+      if(createRoomBtn) createRoomBtn.onclick = async () => {
+        createRoomBtn.disabled = true;
+        const code = roomCodeGen();
+        const budget = parseInt(document.getElementById('budgetInput').value,10) || 1000;
+        const maxItems = parseInt(document.getElementById('maxItemsInput').value,10) || 3;
+        const maxProposals = parseInt(document.getElementById('maxProposalsInput').value,10) || 10;
+        
+        const room = { code, status:'waiting', budget, maxProposals, maxItems, items: state.draftItems, currentIndex:-1, createdAt:Date.now() };
+        await db.collection("rooms").doc(code).set(room);
+        state.roomCode = code;
+        state.role = 'teacher';
+        bindRoomRealtime(code);
+        goto('teacher-room');
+      };
+
+      // 제안 승인
+      document.querySelectorAll('[data-approve]').forEach(el=>{
+        el.onclick = async () => {
+          const pid = el.getAttribute('data-approve');
+          const p = state.proposals.find(x=>x.id===pid);
+          if(!p) return;
+          await db.collection("rooms").doc(state.roomCode).collection("proposals").doc(pid).update({ status:'approved' });
+          const newItems = [...state.room.items, {id:uid(), name:p.valueName, desc:p.desc||'', price:50}];
+          await db.collection("rooms").doc(state.roomCode).update({ items: newItems });
+          toast('가치 목록에 추가했어요.');
+        };
+      });
+
+      // 제안 거절
+      document.querySelectorAll('[data-reject]').forEach(el=>{
+        el.onclick = async () => {
+          const pid = el.getAttribute('data-reject');
+          await db.collection("rooms").doc(state.roomCode).collection("proposals").doc(pid).update({ status:'rejected' });
+        };
+      });
+
+      const startAuctionBtn = document.getElementById('startAuctionBtn');
+      if(startAuctionBtn) startAuctionBtn.onclick = async () => {
+        await db.collection("rooms").doc(state.roomCode).update({ status:'auction', currentIndex:0 });
+        await db.collection("rooms").doc(state.roomCode).collection("bids").doc("0").set({
+          itemIndex:0, highBid:state.room.items[0].price, highBidderId:null, highBidderName:null, history:[], status:'open', countdownEndAt:null, soldName:null, soldPrice:null
+        });
+        bindBidRealtime(state.roomCode, 0);
+      };
+
+      const finalizeBtn = document.getElementById('finalizeBtn');
+      if(finalizeBtn) finalizeBtn.onclick = async () => {
+        const idx = state.room.currentIndex;
+        const b = state.bid;
+        if(!b || !b.highBidderId) return;
+        
+        await db.collection("rooms").doc(state.roomCode).collection("bids").doc(String(idx)).update({
+          status: 'countdown',
+          countdownEndAt: Date.now() + 5000
+        });
+
+        setTimeout(async () => {
+          const studentRef = db.collection("rooms").doc(state.roomCode).collection("students").doc(b.highBidderId);
+          const sSnap = await studentRef.get();
+          if(sSnap.exists){
+            const s = sSnap.data();
+            const item = state.room.items[idx];
+            const newWon = s.won || [];
+            newWon.push({itemId:item.id, name:item.name, price:b.highBid});
+            await studentRef.update({
+              remainingBudget: s.remainingBudget - b.highBid,
+              won: newWon
+            });
+            await db.collection("rooms").doc(state.roomCode).collection("bids").doc(String(idx)).update({
+              status: 'sold',
+              soldName: s.name,
+              soldPrice: b.highBid
+            });
+          }
+        }, 5200);
+      };
+
+      const skipBtn = document.getElementById('skipBtn');
+      if(skipBtn) skipBtn.onclick = async () => {
+        const nextIdx = state.room.currentIndex + 1;
+        if(nextIdx >= state.room.items.length){
+          await db.collection("rooms").doc(state.roomCode).update({ status:'ended' });
+        } else {
+          await db.collection("rooms").doc(state.roomCode).update({ currentIndex: nextIdx });
+          await db.collection("rooms").doc(state.roomCode).collection("bids").doc(String(nextIdx)).set({
+            itemIndex:nextIdx, highBid:state.room.items[nextIdx].price, highBidderId:null, highBidderName:null, history:[], status:'open', countdownEndAt:null, soldName:null, soldPrice:null
+          });
+          bindBidRealtime(state.roomCode, nextIdx);
+        }
+      };
+
+      const nextItemBtn = document.getElementById('nextItemBtn');
+      if(nextItemBtn) nextItemBtn.onclick = async () => {
+        const nextIdx = state.room.currentIndex + 1;
+        if(nextIdx >= state.room.items.length){
+          await db.collection("rooms").doc(state.roomCode).update({ status:'ended' });
+        } else {
+          await db.collection("rooms").doc(state.roomCode).update({ currentIndex: nextIdx });
+          await db.collection("rooms").doc(state.roomCode).collection("bids").doc(String(nextIdx)).set({
+            itemIndex:nextIdx, highBid:state.room.items[nextIdx].price, highBidderId:null, highBidderName:null, history:[], status:'open', countdownEndAt:null, soldName:null, soldPrice:null
+          });
+          bindBidRealtime(state.roomCode, nextIdx);
+        }
+      };
+
+      const joinBtn = document.getElementById('joinBtn');
+      if(joinBtn) joinBtn.onclick = async () => {
+        const code = document.getElementById('joinCode').value.trim();
+        const name = document.getElementById('joinName').value.trim();
+        const errEl = document.getElementById('joinError');
+        if(!code || !name){ errEl.textContent='방 코드와 이름을 모두 입력해주세요.'; errEl.style.display='block'; return; }
+        
+        const rSnap = await db.collection("rooms").doc(code).get();
+        if(!rSnap.exists){
+          errEl.textContent='존재하지 않는 방입니다.'; errEl.style.display='block'; return;
+        }
+        const r = rSnap.data();
+        const sid = uid();
+        const student = {id:sid, name, budget:r.budget, remainingBudget:r.budget, won:[], joinedAt:Date.now()};
+        await db.collection("rooms").doc(code).collection("students").doc(sid).set(student);
+
+        state.roomCode = code;
+        state.studentId = sid;
+        state.studentName = name;
+        state.role = 'student';
+        bindRoomRealtime(code);
+        if(r.status==='auction') bindBidRealtime(code, r.currentIndex);
+        goto('student-room');
+      };
+
+      const proposeBtn = document.getElementById('proposeBtn');
+      if(proposeBtn) proposeBtn.onclick = async () => {
+        const nameEl = document.getElementById('proposeValueName');
+        const descEl = document.getElementById('proposeValueDesc');
+        const vname = nameEl.value.trim();
+        if(!vname){ toast('가치 이름을 입력해주세요.'); return; }
+        const pid = uid();
+        const p = {id:pid, studentId:state.studentId, studentName:state.studentName, valueName:vname, desc:descEl.value.trim(), status:'pending', createdAt:Date.now()};
+        await db.collection("rooms").doc(state.roomCode).collection("proposals").doc(pid).set(p);
+        toast('선생님께 제안을 보냈어요.');
+        nameEl.value = '';
+        descEl.value = '';
+      };
+
+      const placeBidBtn = document.getElementById('placeBidBtn');
+      if(placeBidBtn) placeBidBtn.onclick = async () => {
+        const amount = parseInt(document.getElementById('bidAmountInput').value,10);
+        const idx = state.room.currentIndex;
+        const b = state.bid;
+        const me = myStudent();
+        const errEl = document.getElementById('bidError');
+
+        if(!amount || (b && amount <= b.highBid)){
+          errEl.textContent = '현재 최고가보다 높아야 합니다.'; errEl.style.display='block'; return;
+        }
+        if(me && amount > me.remainingBudget){
+          errEl.textContent = '남은 예산보다 많습니다.'; errEl.style.display='block'; return;
+        }
+
+        const history = b && b.history ? b.history : [];
+        history.push({studentId:state.studentId, name:state.studentName, amount, ts:Date.now()});
+
+        await db.collection("rooms").doc(state.roomCode).collection("bids").doc(String(idx)).update({
+          highBid: amount,
+          highBidderId: state.studentId,
+          highBidderName: state.studentName,
+          history: history
+        });
+        toast('입찰을 완료했습니다!');
+      };
+
+      document.querySelectorAll('[data-quick]').forEach(el=>{
+        el.onclick = () => {
+          const inc = parseInt(el.getAttribute('data-quick'),10);
+          const input = document.getElementById('bidAmountInput');
+          const base = state.bid ? state.bid.highBid : state.room.items[state.room.currentIndex].price;
+          input.value = base + inc;
+        };
+      });
+
+      const sendSheetBtn = document.getElementById('sendSheetBtn');
+      if(sendSheetBtn) sendSheetBtn.onclick = async () => {
+        const url = document.getElementById('webhookInput').value.trim();
+        if(!url){ toast('웹앱 URL을 입력해주세요.'); return; }
+        sendSheetBtn.disabled = true; sendSheetBtn.textContent = '전송 중…';
+        const results = [];
+        state.students.forEach(s=>{
+          if(s.won && s.won.length){
+            s.won.forEach(w=> results.push({studentName:s.name, valueName:w.name, price:w.price, remainingBudget:s.remainingBudget}));
+          } else {
+            results.push({studentName:s.name, valueName:'', price:'', remainingBudget:s.remainingBudget});
+          }
+        });
+        try{
+          await fetch(url, {
+            method:'POST',
+            headers:{'Content-Type':'text/plain;charset=utf-8'},
+            body: JSON.stringify({roomCode: state.roomCode, timestamp: new Date().toLocaleString('ko-KR'), results})
+          });
+          toast('구글 시트로 전송을 완료했습니다!');
+        }catch(e){
+          toast('전송 실패. URL을 다시 확인해주세요.');
+        }
+        sendSheetBtn.disabled = false; sendSheetBtn.textContent = '시트로 전송';
+      };
+    }
+
+    // 첫 화면 렌더링
+    render();
+
+  } catch (err) {
+    console.error("초기화 오류:", err);
+    document.getElementById('app').innerHTML = `
+      <div class="card center" style="margin-top: 50px; border-color: var(--seal);">
+        <h3 style="color: var(--seal); margin-bottom: 8px;">실행 중 오류가 발생했습니다</h3>
+        <p class="muted" style="font-size: 13px;">${err.message || err}</p>
+      </div>
+    `;
+  }
+});
 </script>
 </body>
 </html>
