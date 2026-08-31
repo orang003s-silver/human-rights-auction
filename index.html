@@ -226,14 +226,12 @@ window.addEventListener('DOMContentLoaded', function() {
         localStorage.setItem('auction_session', JSON.stringify({
           roomCode: state.roomCode,
           role: state.role,
-          studentId: state.studentId,
-          studentName: state.studentName
+          studentId: state.studentId || '',
+          studentName: state.studentName || ''
         }));
+        // 최근 방 코드는 따로 영구 기록
+        localStorage.setItem('last_teacher_room_code', state.roomCode);
       }
-    }
-
-    function clearSession() {
-      localStorage.removeItem('auction_session');
     }
 
     function goto(screen){
@@ -273,7 +271,6 @@ window.addEventListener('DOMContentLoaded', function() {
       const unsubRoom = db.collection("rooms").doc(code).onSnapshot((snap) => {
         if(!snap.exists) {
           toast("방이 종료되었거나 존재하지 않습니다.");
-          clearSession();
           goto('home');
           return;
         }
@@ -351,11 +348,11 @@ window.addEventListener('DOMContentLoaded', function() {
       <div class="stack" style="margin-top:26px;">
         <div class="choice-card" data-go="teacher-menu">
           <h3>선생님으로 시작하기</h3>
-          <p>경매방을 새로 만들거나, 이전에 진행하던 방을 이어서 진행합니다.</p>
+          <p>새 방을 만들거나, 이전에 만든 방 코드로 즉시 복귀하여 경매를 이어서 진행합니다.</p>
         </div>
         <div class="choice-card" data-go="student-join">
           <h3>학생으로 참여하기</h3>
-          <p>방 코드로 입장합니다. 새로고침되거나 튕겨도 같은 코드로 다시 들어오면 이어집니다.</p>
+          <p>선생님이 알려준 방 코드로 입장합니다.</p>
         </div>
       </div>
       <p class="footer-note">각 기기(학생 스마트폰·태블릿)에서 이 화면을 열어 참여하세요.</p>
@@ -363,25 +360,29 @@ window.addEventListener('DOMContentLoaded', function() {
     }
 
     function renderTeacherMenu(){
-      const session = JSON.parse(localStorage.getItem('auction_session') || '{}');
-      const hasRecentRoom = session.role === 'teacher' && session.roomCode;
+      const lastCode = localStorage.getItem('last_teacher_room_code') || '';
 
       return `
       <div class="topbar"><button class="linkbtn" data-go="home">← 처음으로</button></div>
       <h2 style="margin-bottom:6px;">선생님 메뉴</h2>
-      <p class="muted" style="margin-bottom:20px;">진행하실 작업을 선택해 주세요.</p>
+      <p class="muted" style="margin-bottom:20px;">이어서 진행할 방이 있다면 코드로 입장하거나, 새 방을 만드세요.</p>
 
       <div class="stack">
-        ${hasRecentRoom ? `
-        <div class="choice-card" id="resumeRecentRoomBtn" style="border-color:var(--gold);">
-          <span class="pill wait" style="margin-bottom:6px;">진행 중인 방 감지됨</span>
-          <h3>기존 방 [${session.roomCode}] 이어하기</h3>
-          <p>이전 방 코드를 그대로 유지하고 진행 화면으로 바로 복귀합니다.</p>
-        </div>` : ''}
+        <!-- 기존 방 이어하기 (방 코드 직접 입력 또는 최근 코드 불러오기) -->
+        <div class="card stack" style="border:1.5px solid var(--gold);">
+          <span class="eyebrow" style="color:var(--gold-dark); font-weight:700;">기존 경매방 이어하기</span>
+          <p class="muted" style="font-size:13px; margin:0;">기존 방 코드를 입력하면 대기실 및 경매 상태 그대로 복귀합니다.</p>
+          <div class="row" style="margin-top:4px;">
+            <input type="text" id="resumeCodeInput" placeholder="방 코드 4자리" maxlength="4" value="${esc(lastCode)}" style="flex:1;">
+            <button class="btn gold" id="resumeRoomBtn" style="white-space:nowrap;">방 이어하기</button>
+          </div>
+          <p id="resumeError" class="muted" style="color:var(--seal); display:none; font-size:12.5px;"></p>
+        </div>
 
+        <!-- 새 방 만들기 버튼 -->
         <div class="choice-card" data-go="teacher-create">
           <h3>새 경매방 만들기 (새 코드 발급)</h3>
-          <p>새로운 방 코드를 부여받아 처음부터 가치 목록과 경매를 시작합니다.</p>
+          <p>새로운 4자리 코드로 가치 목록과 예산을 새로 설정하여 시작합니다.</p>
         </div>
       </div>
       `;
@@ -466,13 +467,13 @@ window.addEventListener('DOMContentLoaded', function() {
 
       return `
       <div class="topbar">
-        <span class="eyebrow">대기실 (고정 코드: ${r.code})</span>
-        <button class="linkbtn" id="exitTeacherRoomBtn">방 나가기</button>
+        <span class="eyebrow">대기실 (방 코드: ${r.code})</span>
+        <button class="linkbtn" data-go="teacher-menu">선생님 메뉴로 나가기</button>
       </div>
       <div class="center" style="margin-bottom:18px;">
         <p class="eyebrow">학생들에게 알려줄 방 코드</p>
         <div class="badge">${r.code}</div>
-        <p class="muted" style="margin-top:10px;">학생이 새로고침해도 이 코드로 다시 접속할 수 있습니다.</p>
+        <p class="muted" style="margin-top:10px;">이 방 코드는 유지되므로 메뉴를 나갔다 와도 다시 들어올 수 있습니다.</p>
       </div>
 
       <div class="card" style="margin-bottom:16px;">
@@ -508,11 +509,11 @@ window.addEventListener('DOMContentLoaded', function() {
       return `
       <div class="topbar">
         <span class="eyebrow">경매 진행 · 방 코드 ${r.code}</span>
-        <span class="pill">${idx+1} / ${r.items.length}</span>
+        <button class="linkbtn" data-go="teacher-menu">선생님 메뉴</button>
       </div>
 
       <div class="auction-stage">
-        <p class="eyebrow">지금 경매 중인 가치</p>
+        <p class="eyebrow">지금 경매 중인 가치 (${idx+1} / ${r.items.length})</p>
         <div class="value-name">${esc(item.name)}</div>
         <div class="value-desc">${esc(item.desc)}</div>
         <div id="bidAreaDiv">${renderBidArea(b, item, status)}</div>
@@ -586,7 +587,7 @@ window.addEventListener('DOMContentLoaded', function() {
       });
 
       return `
-      <div class="topbar"><span class="eyebrow">경매 종료 · 방 ${r.code}</span><button class="linkbtn" id="exitTeacherRoomBtn">처음으로</button></div>
+      <div class="topbar"><span class="eyebrow">경매 종료 · 방 ${r.code}</span><button class="linkbtn" data-go="teacher-menu">선생님 메뉴</button></div>
       <div class="celebrate-wrap">
         <h2>수고 많았어요! 🎉</h2>
         <p>모든 경매가 종료되었습니다.</p>
@@ -635,7 +636,6 @@ window.addEventListener('DOMContentLoaded', function() {
         <button class="btn gold block" id="joinBtn" style="padding:14px;">입장하기</button>
         <p class="muted" id="joinError" style="color:var(--seal); display:none;"></p>
       </div>
-      <p class="footer-note">이전에 접속했던 학생은 동일한 이름과 코드를 넣으면 기존 예산과 낙찰 내역이 그대로 복구됩니다.</p>
       `;
     }
 
@@ -753,34 +753,37 @@ window.addEventListener('DOMContentLoaded', function() {
         };
       });
 
-      // 선생님 방 나가기 버튼 (세션 클리어)
-      const exitTeacherBtn = document.getElementById('exitTeacherRoomBtn');
-      if(exitTeacherBtn) exitTeacherBtn.onclick = () => {
-        cleanupListeners();
-        clearSession();
-        state.room = null;
-        state.roomCode = null;
-        goto('home');
-      };
+      // ✅ 선생님: 기존 방 이어하기 버튼 클릭
+      const resumeRoomBtn = document.getElementById('resumeRoomBtn');
+      if(resumeRoomBtn) resumeRoomBtn.onclick = async () => {
+        const codeInput = (document.getElementById('resumeCodeInput')?.value || '').trim();
+        const errEl = document.getElementById('resumeError');
+        if(!codeInput) {
+          if(errEl){ errEl.textContent = '방 코드를 입력해주세요.'; errEl.style.display = 'block'; }
+          return;
+        }
+        resumeRoomBtn.disabled = true;
+        resumeRoomBtn.textContent = '불러오는 중...';
 
-      // 기존 방 이어하기 버튼
-      const resumeBtn = document.getElementById('resumeRecentRoomBtn');
-      if(resumeBtn) resumeBtn.onclick = async () => {
-        const session = JSON.parse(localStorage.getItem('auction_session') || '{}');
-        if(session.roomCode) {
-          resumeBtn.innerText = '불러오는 중...';
-          const rSnap = await db.collection("rooms").doc(session.roomCode).get();
-          if(rSnap.exists) {
-            state.roomCode = session.roomCode;
-            state.role = 'teacher';
-            state.room = rSnap.data();
-            bindRoomRealtime(session.roomCode);
-            goto('teacher-room');
-          } else {
-            toast("이전 방을 찾을 수 없습니다.");
-            clearSession();
-            render();
+        try {
+          const rSnap = await db.collection("rooms").doc(codeInput).get();
+          if(!rSnap.exists) {
+            if(errEl){ errEl.textContent = '존재하지 않는 방 코드입니다.'; errEl.style.display = 'block'; }
+            resumeRoomBtn.disabled = false;
+            resumeRoomBtn.textContent = '방 이어하기';
+            return;
           }
+
+          state.roomCode = codeInput;
+          state.role = 'teacher';
+          state.room = rSnap.data();
+          saveSession();
+          bindRoomRealtime(codeInput);
+          goto('teacher-room');
+        } catch(err) {
+          if(errEl){ errEl.textContent = '연결 실패: ' + err.message; errEl.style.display = 'block'; }
+          resumeRoomBtn.disabled = false;
+          resumeRoomBtn.textContent = '방 이어하기';
         }
       };
 
@@ -805,7 +808,7 @@ window.addEventListener('DOMContentLoaded', function() {
         };
       });
 
-      // 새 방 만들기 버튼 (새로운 방 코드 발급 및 세션 저장)
+      // ✅ 새 방 만들기 버튼 (새로운 방 코드 발급)
       const createRoomBtn = document.getElementById('createRoomBtn');
       if(createRoomBtn) createRoomBtn.onclick = async () => {
         try {
@@ -834,7 +837,7 @@ window.addEventListener('DOMContentLoaded', function() {
           state.roomCode = code;
           state.role = 'teacher';
           state.room = room;
-          saveSession(); // 고정 세션 저장
+          saveSession(); // 새 방 코드 저장
 
           bindRoomRealtime(code);
           goto('teacher-room');
@@ -965,7 +968,7 @@ window.addEventListener('DOMContentLoaded', function() {
         }
       }
 
-      // ✅ 학생 입장하기 (기존 학생이면 데이터 이어받기 지원)
+      // 학생 입장하기
       const joinBtn = document.getElementById('joinBtn');
       if(joinBtn) joinBtn.onclick = async () => {
         try {
@@ -989,18 +992,15 @@ window.addEventListener('DOMContentLoaded', function() {
           }
           const r = rSnap.data();
 
-          // 이미 같은 이름으로 접속했던 학생인지 확인 (재접속/튕김 복구)
           const studentsSnap = await db.collection("rooms").doc(code).collection("students").where("name", "==", name).get();
           let student = null;
           let sid = '';
 
           if(!studentsSnap.empty){
-            // 기존 학생 데이터 복원
             const docData = studentsSnap.docs[0];
             sid = docData.id;
             student = docData.data();
           } else {
-            // 새 학생 생성
             sid = uid();
             student = {id:sid, name:name, budget:r.budget, remainingBudget:r.budget, won:[], joinedAt:Date.now()};
             await db.collection("rooms").doc(code).collection("students").doc(sid).set(student);
@@ -1012,7 +1012,7 @@ window.addEventListener('DOMContentLoaded', function() {
           state.role = 'student';
           state.room = r;
           state.myStudentData = student;
-          saveSession(); // 세션 저장 (새로고침 시 자동 복귀)
+          saveSession();
 
           bindRoomRealtime(code);
           goto('student-room');
@@ -1121,29 +1121,8 @@ window.addEventListener('DOMContentLoaded', function() {
       };
     }
 
-    // 초기 실행: 기존 세션이 있다면 자동 복구
-    const savedSession = JSON.parse(localStorage.getItem('auction_session') || '{}');
-    if(savedSession.roomCode && savedSession.role) {
-      db.collection("rooms").doc(savedSession.roomCode).get().then((rSnap) => {
-        if(rSnap.exists) {
-          state.roomCode = savedSession.roomCode;
-          state.role = savedSession.role;
-          state.studentId = savedSession.studentId;
-          state.studentName = savedSession.studentName;
-          state.room = rSnap.data();
-          bindRoomRealtime(savedSession.roomCode);
-          goto(savedSession.role === 'teacher' ? 'teacher-room' : 'student-room');
-        } else {
-          clearSession();
-          render();
-        }
-      }).catch(() => {
-        clearSession();
-        render();
-      });
-    } else {
-      render();
-    }
+    // 초기 화면 실행
+    render();
 
   } catch (err) {
     console.error("초기화 오류:", err);
