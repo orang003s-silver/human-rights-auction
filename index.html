@@ -141,7 +141,6 @@
   .stat-box .lbl{font-size:11.5px; color:var(--ink-soft); margin-top:2px;}
 </style>
 
-<!-- Firebase SDK 로드 -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 </head>
@@ -171,7 +170,6 @@ window.addEventListener('DOMContentLoaded', function() {
     }
     const db = firebase.firestore();
 
-    /* ---------- State & Utilities ---------- */
     function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
     function roomCodeGen(){ return String(Math.floor(1000 + Math.random()*9000)); }
     function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -209,6 +207,7 @@ window.addEventListener('DOMContentLoaded', function() {
       roomCode:null,
       studentId:null,
       studentName:'',
+      myStudentData: null, // 학생 본인 전용 데이터
       draftBudget:1000,
       draftMaxProposals: 10,
       draftMaxItems: 3,
@@ -223,11 +222,14 @@ window.addEventListener('DOMContentLoaded', function() {
     };
 
     function goto(screen){
-      state.unsubscribers.forEach(u => u());
-      state.unsubscribers = [];
-      if(state.countdownHandle){ clearInterval(state.countdownHandle); state.countdownHandle=null; }
       state.screen = screen;
       render();
+    }
+
+    function cleanupListeners(){
+      state.unsubscribers.forEach(u => { try{ u(); }catch(e){} });
+      state.unsubscribers = [];
+      if(state.countdownHandle){ clearInterval(state.countdownHandle); state.countdownHandle=null; }
     }
 
     function manageCountdownTicker(status, b){
@@ -251,26 +253,40 @@ window.addEventListener('DOMContentLoaded', function() {
 
     /* ================= REALTIME SYNC ================= */
     function bindRoomRealtime(code){
+      cleanupListeners();
+
+      // 1. 방 정보 동기화
       const unsubRoom = db.collection("rooms").doc(code).onSnapshot((snap) => {
         if(!snap.exists) return;
-        state.room = snap.data();
+        const newRoom = snap.data();
+        const prevStatus = state.room?.status;
+        const prevIdx = state.room?.currentIndex;
+        state.room = newRoom;
+        
+        // 경매 항목 인덱스가 바뀌었을 때 실시간 입찰 리스너 갱신
+        if(newRoom.status === 'auction' && (prevStatus !== 'auction' || prevIdx !== newRoom.currentIndex)){
+          bindBidRealtime(code, newRoom.currentIndex);
+        }
         render();
-      }, (err) => {
-        console.error("Room Sync Error:", err);
-        toast("데이터베이스 연결 오류: " + err.message);
       });
       state.unsubscribers.push(unsubRoom);
 
+      // 2. 학생 목록 동기화
       const unsubStudents = db.collection("rooms").doc(code).collection("students").orderBy("joinedAt", "asc").onSnapshot((snap) => {
         state.students = snap.docs.map(d => d.data());
+        if(state.studentId){
+          const me = state.students.find(s => s.id === state.studentId);
+          if(me) state.myStudentData = me;
+        }
         render();
-      }, (err) => console.error("Students Sync Error:", err));
+      });
       state.unsubscribers.push(unsubStudents);
 
+      // 3. 제안 목록 동기화
       const unsubProposals = db.collection("rooms").doc(code).collection("proposals").orderBy("createdAt", "asc").onSnapshot((snap) => {
         state.proposals = snap.docs.map(d => d.data());
         render();
-      }, (err) => console.error("Proposals Sync Error:", err));
+      });
       state.unsubscribers.push(unsubProposals);
     }
 
@@ -278,7 +294,7 @@ window.addEventListener('DOMContentLoaded', function() {
       const unsubBid = db.collection("rooms").doc(code).collection("bids").doc(String(idx)).onSnapshot((snap) => {
         state.bid = snap.exists ? snap.data() : null;
         render();
-      }, (err) => console.error("Bid Sync Error:", err));
+      });
       state.unsubscribers.push(unsubBid);
     }
 
@@ -581,13 +597,8 @@ window.addEventListener('DOMContentLoaded', function() {
       return renderStudentEnded(r);
     }
 
-    function myStudent(){
-      return state.students.find(s=>s.id===state.studentId);
-    }
-
     function renderStudentWaiting(r){
-      const me = myStudent();
-      const budget = me ? me.remainingBudget : r.budget;
+      const budget = state.myStudentData ? state.myStudentData.remainingBudget : r.budget;
       const myProposals = state.proposals.filter(p=>p.studentId===state.studentId);
       const myPropHtml = myProposals.length
         ? myProposals.map(p=>`<div class="proposal-card"><div class="proposal-head"><strong>${esc(p.valueName)}</strong><span class="pill ${p.status==='approved'?'ok':p.status==='rejected'?'no':'wait'}">${p.status==='approved'?'채택됨':p.status==='rejected'?'거절됨':'대기중'}</span></div></div>`).join('')
@@ -623,8 +634,7 @@ window.addEventListener('DOMContentLoaded', function() {
       const item = (r.items && r.items[idx]) ? r.items[idx] : { name:'가치', desc:'', price:50 };
       const b = state.bid;
       const status = b ? b.status : 'open';
-      const me = myStudent();
-      const budget = me ? me.remainingBudget : 0;
+      const budget = state.myStudentData ? state.myStudentData.remainingBudget : 0;
 
       manageCountdownTicker(status, b);
 
@@ -637,18 +647,19 @@ window.addEventListener('DOMContentLoaded', function() {
         <div class="value-name">${esc(item.name)}</div>
         <div class="value-desc">${esc(item.desc)}</div>
         <div id="bidAreaDiv">${renderBidArea(b, item, status)}</div>
-        <div>${renderStudentBidControls(r, b, item, status, me)}</div>
+        <div>${renderStudentBidControls(r, b, item, status)}</div>
       </div>
 
       <div class="card" style="margin-top:16px;">
         <h3 style="font-size:14px; margin-bottom:6px;">내가 얻은 가치</h3>
-        <div>${renderMyWon(me)}</div>
+        <div>${renderMyWon()}</div>
       </div>
       `;
     }
 
-    function renderStudentBidControls(r, b, item, status, me){
+    function renderStudentBidControls(r, b, item, status){
       const maxItems = r.maxItems || 3;
+      const me = state.myStudentData;
       if(me && me.won && me.won.length >= maxItems) return `<p class="muted center">최대 낙찰 개수에 도달했습니다.</p>`;
       if(status==='countdown') return `<p class="muted center">입찰이 마감되었습니다.</p>`;
       if(status==='sold') return `<p class="muted center">낙찰되었습니다.</p>`;
@@ -667,19 +678,19 @@ window.addEventListener('DOMContentLoaded', function() {
       `;
     }
 
-    function renderMyWon(me){
+    function renderMyWon(){
+      const me = state.myStudentData;
       if(!me || !me.won || !me.won.length) return `<p class="muted" style="font-size:13px;">아직 낙찰받은 가치가 없어요.</p>`;
       return `<ul class="list-plain">${me.won.map(w=>`<li class="participant"><span>${esc(w.name)}</span><span class="pill">${w.price}</span></li>`).join('')}</ul>`;
     }
 
     function renderStudentEnded(r){
-      const me = myStudent();
       return `
       <div class="topbar"><span class="eyebrow">경매 종료 · 방 ${r.code}</span></div>
       <div class="celebrate-wrap"><h2>수고했어요, ${esc(state.studentName)}님! 🎉</h2></div>
       <div class="card">
-        <div class="budget-strip" style="margin-bottom:14px;"><span>남은 예산</span><b>${me ? me.remainingBudget : '-'}</b></div>
-        ${renderMyWon(me)}
+        <div class="budget-strip" style="margin-bottom:14px;"><span>남은 예산</span><b>${state.myStudentData ? state.myStudentData.remainingBudget : '-'}</b></div>
+        ${renderMyWon()}
       </div>
       `;
     }
@@ -687,7 +698,10 @@ window.addEventListener('DOMContentLoaded', function() {
     /* ================= HANDLERS ================= */
     function attachHandlers(){
       document.querySelectorAll('[data-go]').forEach(el=>{
-        el.onclick = () => goto(el.getAttribute('data-go'));
+        el.onclick = () => {
+          cleanupListeners();
+          goto(el.getAttribute('data-go'));
+        };
       });
 
       const addItemBtn = document.getElementById('addItemBtn');
@@ -719,13 +733,6 @@ window.addEventListener('DOMContentLoaded', function() {
           createRoomBtn.textContent = '방 생성 중...';
 
           const items = collectDraftItemsFromDOM();
-          if(!items.length) {
-            toast('가치 목록이 비어있습니다.');
-            createRoomBtn.disabled = false;
-            createRoomBtn.textContent = '경매방 만들기';
-            return;
-          }
-
           const code = roomCodeGen();
           const budget = parseInt(document.getElementById('budgetInput')?.value, 10) || 1000;
           const maxItems = parseInt(document.getElementById('maxItemsInput')?.value, 10) || 3;
@@ -742,7 +749,6 @@ window.addEventListener('DOMContentLoaded', function() {
             createdAt: Date.now() 
           };
 
-          // Firestore에 방 정보 기록
           await db.collection("rooms").doc(code).set(room);
 
           state.roomCode = code;
@@ -752,7 +758,7 @@ window.addEventListener('DOMContentLoaded', function() {
           goto('teacher-room');
         } catch (err) {
           console.error("방 만들기 오류:", err);
-          alert("방 생성 실패: " + (err.message || err));
+          alert("방 생성 실패: " + err.message);
           createRoomBtn.disabled = false;
           createRoomBtn.textContent = '경매방 만들기';
         }
@@ -804,13 +810,12 @@ window.addEventListener('DOMContentLoaded', function() {
             soldName: '', 
             soldPrice: 0
           });
-          bindBidRealtime(state.roomCode, 0);
         } catch(err) {
           alert('경매 시작 실패: ' + err.message);
         }
       };
 
-      // 낙찰 대기 (카운트다운)
+      // 낙찰 대기
       const finalizeBtn = document.getElementById('finalizeBtn');
       if(finalizeBtn) finalizeBtn.onclick = async () => {
         try {
@@ -848,14 +853,10 @@ window.addEventListener('DOMContentLoaded', function() {
       };
 
       const skipBtn = document.getElementById('skipBtn');
-      if(skipBtn) skipBtn.onclick = async () => {
-        await advanceItem();
-      };
+      if(skipBtn) skipBtn.onclick = async () => { await advanceItem(); };
 
       const nextItemBtn = document.getElementById('nextItemBtn');
-      if(nextItemBtn) nextItemBtn.onclick = async () => {
-        await advanceItem();
-      };
+      if(nextItemBtn) nextItemBtn.onclick = async () => { await advanceItem(); };
 
       async function advanceItem() {
         try {
@@ -876,23 +877,21 @@ window.addEventListener('DOMContentLoaded', function() {
               soldName: '', 
               soldPrice: 0
             });
-            bindBidRealtime(state.roomCode, nextIdx);
           }
         } catch(err) {
           alert('다음 항목 이동 실패: ' + err.message);
         }
       }
 
-      // 학생 입장하기
+      // ✅ 학생 입장하기 (즉시 렌더링 적용)
       const joinBtn = document.getElementById('joinBtn');
       if(joinBtn) joinBtn.onclick = async () => {
         try {
-          const code = document.getElementById('joinCode').value.trim();
-          const name = document.getElementById('joinName').value.trim();
+          const code = (document.getElementById('joinCode')?.value || '').trim();
+          const name = (document.getElementById('joinName')?.value || '').trim();
           const errEl = document.getElementById('joinError');
           if(!code || !name){ 
-            errEl.textContent='방 코드와 이름을 모두 입력해주세요.'; 
-            errEl.style.display='block'; 
+            if(errEl){ errEl.textContent='방 코드와 이름을 모두 입력해주세요.'; errEl.style.display='block'; }
             return; 
           }
           
@@ -901,8 +900,7 @@ window.addEventListener('DOMContentLoaded', function() {
 
           const rSnap = await db.collection("rooms").doc(code).get();
           if(!rSnap.exists){
-            errEl.textContent='존재하지 않는 방입니다. 코드를 다시 확인하세요.'; 
-            errEl.style.display='block'; 
+            if(errEl){ errEl.textContent='존재하지 않는 방입니다.'; errEl.style.display='block'; }
             joinBtn.disabled = false;
             joinBtn.textContent = '입장하기';
             return;
@@ -910,17 +908,23 @@ window.addEventListener('DOMContentLoaded', function() {
           const r = rSnap.data();
           const sid = uid();
           const student = {id:sid, name:name, budget:r.budget, remainingBudget:r.budget, won:[], joinedAt:Date.now()};
-          await db.collection("rooms").doc(code).collection("students").doc(sid).set(student);
-
+          
+          // 로컬 State에 먼저 세팅해서 로딩 화면 없이 즉시 전환
           state.roomCode = code;
           state.studentId = sid;
           state.studentName = name;
           state.role = 'student';
           state.room = r;
+          state.myStudentData = student;
+          
+          // Firestore에 학생 정보 저장
+          await db.collection("rooms").doc(code).collection("students").doc(sid).set(student);
+
+          // 실시간 연결 시작
           bindRoomRealtime(code);
-          if(r.status==='auction') bindBidRealtime(code, r.currentIndex);
           goto('student-room');
         } catch(err) {
+          console.error("입장 에러:", err);
           alert('입장 실패: ' + err.message);
           joinBtn.disabled = false;
           joinBtn.textContent = '입장하기';
@@ -933,7 +937,7 @@ window.addEventListener('DOMContentLoaded', function() {
         try {
           const nameEl = document.getElementById('proposeValueName');
           const descEl = document.getElementById('proposeValueDesc');
-          const vname = nameEl.value.trim();
+          const vname = (nameEl?.value || '').trim();
           if(!vname){ toast('가치 이름을 입력해주세요.'); return; }
           const pid = uid();
           const p = {
@@ -941,14 +945,14 @@ window.addEventListener('DOMContentLoaded', function() {
             studentId: state.studentId, 
             studentName: state.studentName, 
             valueName: vname, 
-            desc: descEl.value.trim() || '', 
+            desc: (descEl?.value || '').trim(), 
             status: 'pending', 
             createdAt: Date.now()
           };
           await db.collection("rooms").doc(state.roomCode).collection("proposals").doc(pid).set(p);
           toast('선생님께 제안을 보냈어요.');
-          nameEl.value = '';
-          descEl.value = '';
+          if(nameEl) nameEl.value = '';
+          if(descEl) descEl.value = '';
         } catch(err) {
           toast('제안 실패: ' + err.message);
         }
@@ -958,17 +962,19 @@ window.addEventListener('DOMContentLoaded', function() {
       const placeBidBtn = document.getElementById('placeBidBtn');
       if(placeBidBtn) placeBidBtn.onclick = async () => {
         try {
-          const amount = parseInt(document.getElementById('bidAmountInput').value,10);
+          const amount = parseInt(document.getElementById('bidAmountInput')?.value, 10);
           const idx = state.room.currentIndex;
           const b = state.bid;
-          const me = myStudent();
+          const me = state.myStudentData;
           const errEl = document.getElementById('bidError');
 
           if(!amount || (b && amount <= b.highBid)){
-            errEl.textContent = '현재 최고가보다 높아야 합니다.'; errEl.style.display='block'; return;
+            if(errEl){ errEl.textContent = '현재 최고가보다 높아야 합니다.'; errEl.style.display='block'; }
+            return;
           }
           if(me && amount > me.remainingBudget){
-            errEl.textContent = '남은 예산보다 많습니다.'; errEl.style.display='block'; return;
+            if(errEl){ errEl.textContent = '남은 예산보다 많습니다.'; errEl.style.display='block'; }
+            return;
           }
 
           const history = (b && b.history) ? b.history : [];
@@ -986,20 +992,18 @@ window.addEventListener('DOMContentLoaded', function() {
         }
       };
 
-      // 빠른 입찰 버튼 (+10, +50, +100)
       document.querySelectorAll('[data-quick]').forEach(el=>{
         el.onclick = () => {
           const inc = parseInt(el.getAttribute('data-quick'),10);
           const input = document.getElementById('bidAmountInput');
           const base = state.bid ? state.bid.highBid : state.room.items[state.room.currentIndex].price;
-          input.value = base + inc;
+          if(input) input.value = base + inc;
         };
       });
 
-      // 구글 시트 전송
       const sendSheetBtn = document.getElementById('sendSheetBtn');
       if(sendSheetBtn) sendSheetBtn.onclick = async () => {
-        const url = document.getElementById('webhookInput').value.trim();
+        const url = (document.getElementById('webhookInput')?.value || '').trim();
         if(!url){ toast('웹앱 URL을 입력해주세요.'); return; }
         sendSheetBtn.disabled = true; sendSheetBtn.textContent = '전송 중…';
         const results = [];
@@ -1024,7 +1028,6 @@ window.addEventListener('DOMContentLoaded', function() {
       };
     }
 
-    // 홈 화면 렌더링
     render();
 
   } catch (err) {
