@@ -1,0 +1,1259 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>가치 경매</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#1c2b3a;
+    --ink-soft:#3d5164;
+    --paper:#f5efe0;
+    --paper-dark:#eadfc4;
+    --card:#faf6ea;
+    --gold:#b8873b;
+    --gold-light:#d9ad6a;
+    --gold-dark:#8f6526;
+    --seal:#8a3324;
+    --line:#c9bd9e;
+    --green:#4a6b4d;
+    --shadow: 0 1px 0 rgba(28,43,58,0.06);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(1200px 600px at 10% -10%, #fffdf6 0%, transparent 60%),
+      var(--paper);
+    color:var(--ink);
+    font-family:'Noto Sans KR', -apple-system, sans-serif;
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+  #app{max-width:720px;margin:0 auto;padding:20px 18px 60px;min-height:100vh;}
+  h1,h2,h3{font-family:'Noto Serif KR', serif; margin:0; color:var(--ink); font-weight:700;}
+  .eyebrow{font-family:'Noto Sans KR',sans-serif; font-size:12.5px; letter-spacing:0.02em; color:var(--ink-soft); margin:0 0 6px;}
+  .stack{display:flex;flex-direction:column;gap:14px;}
+  .row{display:flex;gap:10px;flex-wrap:wrap;}
+  .btn{
+    font-family:'Noto Sans KR',sans-serif;
+    font-size:15px; font-weight:700; cursor:pointer;
+    border:1.5px solid var(--ink); background:var(--ink); color:var(--paper);
+    padding:13px 20px; border-radius:3px; transition:transform .08s ease, opacity .15s ease;
+    text-align:center;
+  }
+  .btn:active{transform:scale(0.98);}
+  .btn:disabled{opacity:.4; cursor:not-allowed;}
+  .btn.secondary{background:transparent; color:var(--ink);}
+  .btn.gold{background:var(--gold); border-color:var(--gold-dark); color:#fff8ea;}
+  .btn.gold:hover{background:var(--gold-dark);}
+  .btn.seal{background:var(--seal); border-color:#5e2117; color:#fff1ec;}
+  .btn.small{padding:8px 12px; font-size:13px;}
+  .btn.block{width:100%;}
+  input[type=text],input[type=number],textarea{
+    font-family:'Noto Sans KR',sans-serif; font-size:16px;
+    border:1.5px solid var(--line); background:#fffef9;
+    padding:12px 13px; border-radius:3px; color:var(--ink); width:100%;
+  }
+  input:focus,textarea:focus{outline:2px solid var(--gold); outline-offset:1px; border-color:var(--gold);}
+  label.field-label{font-size:13px; color:var(--ink-soft); font-weight:700; display:block; margin-bottom:5px;}
+  .card{
+    background:var(--card); border:1px solid var(--line); border-radius:4px;
+    padding:20px; box-shadow:var(--shadow);
+  }
+  .hairline{border:none; border-top:1px solid var(--line); margin:14px 0;}
+  .center{text-align:center;}
+  .muted{color:var(--ink-soft); font-size:14px; line-height:1.55;}
+  .badge{
+    display:inline-flex; align-items:center; justify-content:center;
+    font-family:'Noto Serif KR',serif; font-weight:700; font-size:30px;
+    letter-spacing:0.14em; color:var(--ink); background:#fffef9;
+    border:2px solid var(--gold); border-radius:50%;
+    width:118px; height:118px; margin:0 auto;
+  }
+  .home-hero{text-align:center; padding:36px 4px 8px;}
+  .home-hero h1{font-size:34px; margin-bottom:10px;}
+  .home-hero p{color:var(--ink-soft); font-size:15px; max-width:420px; margin:0 auto;}
+  .choice-card{
+    border:1.5px solid var(--ink); border-radius:4px; padding:22px; cursor:pointer;
+    background:var(--card); transition:background .15s;
+  }
+  .choice-card:hover{background:var(--paper-dark);}
+  .choice-card h3{font-size:19px; margin-bottom:4px;}
+  .choice-card p{margin:0; font-size:13.5px; color:var(--ink-soft);}
+  .item-row{
+    display:flex; gap:10px; align-items:flex-start; border:1px solid var(--line);
+    border-radius:3px; padding:12px; background:#fffef9;
+  }
+  .item-num{
+    font-family:'Noto Serif KR',serif; font-weight:700; color:var(--gold-dark);
+    font-size:15px; min-width:22px; padding-top:2px;
+  }
+  .item-fields{flex:1; display:flex; flex-direction:column; gap:6px;}
+  .item-fields input{font-size:14px; padding:8px 10px;}
+  .item-fields textarea{font-size:13px; padding:8px 10px; resize:vertical; min-height:38px;}
+  .remove-x{background:none; border:none; color:var(--seal); cursor:pointer; font-size:18px; padding:2px 6px;}
+  .pill{
+    display:inline-block; font-size:12px; font-weight:700; padding:3px 10px;
+    border-radius:20px; border:1px solid var(--line); color:var(--ink-soft);
+  }
+  .pill.wait{border-color:var(--gold); color:var(--gold-dark);}
+  .pill.ok{border-color:var(--green); color:var(--green);}
+  .pill.no{border-color:var(--seal); color:var(--seal);}
+  .list-plain{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px;}
+  .participant{display:flex; justify-content:space-between; align-items:center; font-size:14.5px; padding:8px 10px; background:#fffef9; border:1px solid var(--line); border-radius:3px;}
+  .proposal-card{border:1px solid var(--line); border-radius:3px; padding:12px; background:#fffef9;}
+  .proposal-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;}
+  .topbar{display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;}
+  .topbar .room-tag{font-family:'Noto Serif KR',serif; font-weight:700; font-size:14px; border:1px solid var(--ink); padding:5px 11px; border-radius:20px;}
+  .linkbtn{background:none;border:none;color:var(--ink-soft);text-decoration:underline;cursor:pointer;font-size:13px;padding:0;}
+  .auction-stage{border:2px solid var(--ink); border-radius:5px; padding:24px 20px; text-align:center; background:var(--card);}
+  .auction-stage .value-name{font-size:26px; margin-bottom:6px;}
+  .auction-stage .value-desc{color:var(--ink-soft); font-size:14.5px; line-height:1.6; margin-bottom:16px;}
+  .bid-display{
+    background:var(--ink); color:var(--paper); border-radius:4px; padding:18px;
+    display:flex; justify-content:space-between; align-items:center; margin:14px 0;
+  }
+  .bid-display .amt{font-family:'Noto Serif KR',serif; font-size:32px; font-weight:700; color:var(--gold-light);}
+  .bid-display .who{font-size:13px; opacity:.85;}
+  .bid-quick{display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin:10px 0;}
+  .budget-strip{
+    display:flex; justify-content:space-between; align-items:center; font-size:13.5px;
+    background:var(--paper-dark); border-radius:3px; padding:9px 13px; margin-bottom:14px;
+  }
+  .budget-strip b{font-family:'Noto Serif KR',serif; font-size:16px; color:var(--gold-dark);}
+  .history-row{display:flex; justify-content:space-between; font-size:13px; padding:5px 0; border-bottom:1px dashed var(--line); color:var(--ink-soft);}
+  table.results{width:100%; border-collapse:collapse; font-size:13.5px;}
+  table.results th, table.results td{border-bottom:1px solid var(--line); padding:9px 6px; text-align:left;}
+  table.results th{font-family:'Noto Serif KR',serif; color:var(--ink-soft); font-weight:700; font-size:12.5px;}
+  .toast{
+    position:fixed; bottom:18px; left:50%; transform:translateX(-50%);
+    background:var(--ink); color:var(--paper); padding:11px 18px; border-radius:4px;
+    font-size:13.5px; z-index:50; max-width:90%; text-align:center; box-shadow:0 6px 18px rgba(0,0,0,.25);
+  }
+  .footer-note{margin-top:26px; text-align:center; font-size:12px; color:var(--ink-soft); opacity:.7;}
+  .celebrate-wrap{position:relative; text-align:center; padding:18px 0 6px; overflow:visible;}
+  .celebrate-wrap h2{font-size:28px; margin-bottom:6px;}
+  .celebrate-wrap p{color:var(--ink-soft); font-size:14.5px;}
+  .confetti-layer{position:absolute; top:-10px; left:0; right:0; height:0; overflow:visible; pointer-events:none;}
+  .confetti-piece{position:absolute; top:-16px; width:8px; height:14px; opacity:0.9; border-radius:1px; animation:confetti-fall 2.4s ease-in forwards;}
+  @keyframes confetti-fall{ to { transform: translateY(200px) rotate(340deg); opacity:0; } }
+  @media (prefers-reduced-motion: reduce){ .confetti-piece{animation:none; display:none;} }
+  .stat-row{display:flex; gap:10px; margin:16px 0;}
+  .stat-box{flex:1; text-align:center; background:var(--paper-dark); border-radius:4px; padding:12px 8px;}
+  .stat-box .num{font-family:'Noto Serif KR',serif; font-size:22px; font-weight:700; color:var(--gold-dark);}
+  .stat-box .lbl{font-size:11.5px; color:var(--ink-soft); margin-top:2px;}
+  @media (max-width:480px){
+    .badge{width:96px;height:96px;font-size:24px;}
+    .auction-stage .value-name{font-size:21px;}
+    .bid-display .amt{font-size:26px;}
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+(function(){
+
+/* ---------- Utilities ---------- */
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function roomCodeGen(){ return String(Math.floor(1000 + Math.random()*9000)); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+async function sGet(key, shared){
+  try{ const r = await window.storage.get(key, !!shared); return r ? r.value : null; }
+  catch(e){ return null; }
+}
+async function sSet(key, value, shared){
+  try{ await window.storage.set(key, value, !!shared); return true; }
+  catch(e){ console.error('storage set failed', e); return false; }
+}
+async function sList(prefix, shared){
+  try{ const r = await window.storage.list(prefix, !!shared); return r ? r.keys : []; }
+  catch(e){ return []; }
+}
+async function sDelete(key, shared){
+  try{ await window.storage.delete(key, !!shared); }catch(e){}
+}
+
+let toastTimer=null;
+function toast(msg){
+  let t = document.getElementById('toast');
+  if(!t){
+    t = document.createElement('div');
+    t.id='toast'; t.className='toast';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.display='block';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>{ t.style.display='none'; }, 2600);
+}
+
+const DEFAULT_VALUES = [
+  {name:'생명권', desc:'모든 사람은 생명을 존중받고 안전하게 살아갈 권리가 있다', price:50},
+  {name:'자유권', desc:'자신의 생각과 행동을 스스로 결정할 자유', price:50},
+  {name:'평등권', desc:'성별, 신분, 인종에 관계없이 동등하게 대우받을 권리', price:50},
+  {name:'행복추구권', desc:'자신이 원하는 삶의 방식으로 행복을 추구할 권리', price:50},
+  {name:'교육받을 권리', desc:'배우고 성장할 기회를 보장받을 권리', price:50},
+  {name:'사생활의 자유', desc:'개인의 사적인 영역을 존중받을 권리', price:50},
+  {name:'표현의 자유', desc:'자신의 생각을 자유롭게 말하고 표현할 권리', price:50},
+  {name:'노동의 권리', desc:'정당한 대가를 받으며 일할 권리', price:50},
+  {name:'참정권', desc:'정치에 참여하고 투표할 권리', price:50},
+  {name:'안전하게 살 권리', desc:'폭력과 위험으로부터 보호받을 권리', price:50},
+  {name:'환경권', desc:'깨끗한 환경에서 살아갈 권리', price:50},
+  {name:'문화를 누릴 권리', desc:'다양한 문화와 예술을 자유롭게 즐길 권리', price:50},
+  {name:'재산권', desc:'자신의 재산을 정당하게 갖고 지킬 권리', price:50},
+  {name:'신체의 자유', desc:'부당하게 구속되거나 강요받지 않을 권리', price:50},
+  {name:'양심과 종교의 자유', desc:'자신의 신념과 믿음을 지키고 표현할 권리', price:50},
+  {name:'휴식을 취할 권리', desc:'충분히 쉬고 여가를 누릴 권리', price:50},
+  {name:'차별받지 않을 권리', desc:'어떤 이유로도 부당하게 차별받지 않을 권리', price:50},
+  {name:'정보에 접근할 권리', desc:'필요한 정보를 자유롭게 알고 얻을 권리', price:50},
+  {name:'가족과 함께할 권리', desc:'가족과의 유대를 유지하고 보호받을 권리', price:50},
+  {name:'도움을 요청할 권리', desc:'어려움에 처했을 때 도움을 구하고 보호받을 권리', price:50}
+];
+const DEFAULT_MAX_PROPOSALS = 10;
+
+/* ---------- State ---------- */
+let state = {
+  screen:'home',
+  role:null,
+  roomCode:null,
+  studentId:null,
+  studentName:'',
+  draftBudget:1000,
+  draftMaxProposals: DEFAULT_MAX_PROPOSALS,
+  draftMaxItems: 3,
+  draftItems: DEFAULT_VALUES.map(v=>({id:uid(), ...v})),
+  room:null,
+  students:[],
+  proposals:[],
+  bid:null,
+  pollHandle:null,
+  countdownHandle:null,
+  webhookUrl:''
+};
+
+function goto(screen){
+  if(state.pollHandle){ clearInterval(state.pollHandle); state.pollHandle=null; }
+  if(state.countdownHandle){ clearInterval(state.countdownHandle); state.countdownHandle=null; }
+  state.screen = screen;
+  render();
+}
+
+function manageCountdownTicker(status, b){
+  if(status !== 'countdown'){
+    if(state.countdownHandle){ clearInterval(state.countdownHandle); state.countdownHandle=null; }
+    return;
+  }
+  if(state.countdownHandle) return; // already ticking
+  const tick = () => {
+    const el = document.getElementById('countdownNum');
+    if(!el || !state.bid || state.bid.status !== 'countdown'){
+      clearInterval(state.countdownHandle); state.countdownHandle=null; return;
+    }
+    const remainingMs = (state.bid.countdownEndAt || 0) - Date.now();
+    const secs = Math.max(0, Math.ceil(remainingMs/1000));
+    el.textContent = secs;
+  };
+  tick();
+  state.countdownHandle = setInterval(tick, 200);
+}
+
+/* ---------- Storage keys ---------- */
+const K = {
+  room: c => `room:${c}`,
+  student: (c,id) => `student:${c}:${id}`,
+  studentPrefix: c => `student:${c}:`,
+  proposal: (c,id) => `proposal:${c}:${id}`,
+  proposalPrefix: c => `proposal:${c}:`,
+  bid: (c,idx) => `bid:${c}:${idx}`
+};
+
+/* ---------- Data ops ---------- */
+async function loadRoom(code){
+  const raw = await sGet(K.room(code), true);
+  return raw ? JSON.parse(raw) : null;
+}
+async function saveRoom(room){
+  await sSet(K.room(room.code), JSON.stringify(room), true);
+}
+async function loadStudents(code){
+  const keys = await sList(K.studentPrefix(code), true);
+  const out = [];
+  for(const k of keys){
+    const v = await sGet(k, true);
+    if(v) out.push(JSON.parse(v));
+  }
+  out.sort((a,b)=>a.joinedAt-b.joinedAt);
+  return out;
+}
+async function loadProposals(code){
+  const keys = await sList(K.proposalPrefix(code), true);
+  const out = [];
+  for(const k of keys){
+    const v = await sGet(k, true);
+    if(v) out.push(JSON.parse(v));
+  }
+  out.sort((a,b)=>a.createdAt-b.createdAt);
+  return out;
+}
+async function loadBid(code, idx){
+  const raw = await sGet(K.bid(code, idx), true);
+  return raw ? JSON.parse(raw) : null;
+}
+async function saveBid(code, idx, bid){
+  await sSet(K.bid(code, idx), JSON.stringify(bid), true);
+}
+
+/* ================= RENDER ROUTER ================= */
+function render(){
+  const app = document.getElementById('app');
+  if(state.screen==='home') app.innerHTML = renderHome();
+  else if(state.screen==='teacher-create') app.innerHTML = renderTeacherCreate();
+  else if(state.screen==='teacher-room') { app.innerHTML = renderTeacherRoom(); startTeacherPolling(); }
+  else if(state.screen==='student-join') app.innerHTML = renderStudentJoin();
+  else if(state.screen==='student-room') { app.innerHTML = renderStudentRoom(); startStudentPolling(); }
+  attachHandlers();
+}
+
+/* ================= HOME ================= */
+function renderHome(){
+  return `
+  <div class="home-hero">
+    <p class="eyebrow">도덕 수업 · 인권 가치 경매</p>
+    <h1>가치 경매</h1>
+    <p>한정된 예산으로 인권 가치를 두고 경합합니다.<br>무엇에 얼마의 값을 매길 것인가, 그 선택이 곧 우리의 가치관입니다.</p>
+  </div>
+  <div class="stack" style="margin-top:26px;">
+    <div class="choice-card" data-go="teacher-create">
+      <h3>선생님으로 시작하기</h3>
+      <p>경매방을 만들고 진행합니다. 가치 목록 설정, 실시간 입찰 진행, 결과를 구글 시트로 정리할 수 있어요.</p>
+    </div>
+    <div class="choice-card" data-go="student-join">
+      <h3>학생으로 참여하기</h3>
+      <p>선생님이 알려준 방 코드로 입장해 예산 안에서 원하는 가치에 입찰합니다.</p>
+    </div>
+  </div>
+  <p class="footer-note">각 기기(학생 개인 스마트폰·태블릿)에서 이 화면을 열어 참여하세요.</p>
+  `;
+}
+
+/* ================= TEACHER: CREATE ================= */
+function renderTeacherCreate(){
+  const itemsHtml = state.draftItems.map((it, i)=>`
+    <div class="item-row" data-item-id="${it.id}">
+      <div class="item-num">${i+1}</div>
+      <div class="item-fields">
+        <input type="text" class="it-name" placeholder="가치 이름" value="${esc(it.name)}">
+        <textarea class="it-desc" placeholder="설명">${esc(it.desc)}</textarea>
+        <input type="number" class="it-price" placeholder="시작가" value="${it.price}" min="0">
+      </div>
+      <button class="remove-x" data-remove-item="${it.id}" title="삭제">✕</button>
+    </div>
+  `).join('');
+
+  return `
+  <div class="topbar">
+    <button class="linkbtn" data-go="home">← 처음으로</button>
+  </div>
+  <h2 style="margin-bottom:4px;">경매방 만들기</h2>
+  <p class="muted" style="margin-bottom:18px;">학생 예산과 경매에 올릴 가치 목록을 정하세요. 학생 제안은 대기실에서 실시간으로 추가할 수 있어요.</p>
+
+  <div class="card stack">
+    <div class="row">
+      <div style="flex:1; min-width:130px;">
+        <label class="field-label">학생 1인당 시작 예산</label>
+        <input type="number" id="budgetInput" value="${state.draftBudget}" min="0">
+      </div>
+      <div style="flex:1; min-width:130px;">
+        <label class="field-label">학생 1인당 최대 낙찰 개수</label>
+        <input type="number" id="maxItemsInput" value="${state.draftMaxItems}" min="1">
+      </div>
+      <div style="flex:1; min-width:130px;">
+        <label class="field-label">학생 제안 최대 개수</label>
+        <input type="number" id="maxProposalsInput" value="${state.draftMaxProposals}" min="0">
+      </div>
+    </div>
+    <p class="muted" style="font-size:12.5px;">고정 목록이 다 채워졌다고 느껴지면 제안 개수를 0으로 설정해 학생 제안을 받지 않을 수도 있어요.</p>
+  </div>
+
+  <div style="margin-top:22px;" class="stack">
+    <div class="row" style="justify-content:space-between; align-items:center;">
+      <h3 style="font-size:16px;">경매 가치 목록 (${state.draftItems.length}개)</h3>
+      <button class="btn secondary small" id="resetDefaultsBtn">기본 목록으로 재설정</button>
+    </div>
+    <div id="itemsList" class="stack">${itemsHtml}</div>
+    <button class="btn secondary block" id="addItemBtn">+ 가치 항목 추가</button>
+  </div>
+
+  <button class="btn gold block" id="createRoomBtn" style="margin-top:24px; font-size:16px; padding:15px;">경매방 만들기</button>
+  `;
+}
+
+function collectDraftItemsFromDOM(){
+  const rows = document.querySelectorAll('#itemsList .item-row');
+  const items = [];
+  rows.forEach(row=>{
+    const id = row.getAttribute('data-item-id');
+    const name = row.querySelector('.it-name').value.trim();
+    const desc = row.querySelector('.it-desc').value.trim();
+    const price = parseInt(row.querySelector('.it-price').value,10) || 0;
+    if(name) items.push({id, name, desc, price});
+  });
+  return items;
+}
+
+/* ================= TEACHER: ROOM (waiting / auction / ended) ================= */
+function renderTeacherRoom(){
+  const r = state.room;
+  if(!r) return `<div class="center muted" style="padding:60px 0;">불러오는 중…</div>`;
+  if(r.status==='waiting') return renderTeacherWaiting(r);
+  if(r.status==='auction') return renderTeacherAuction(r);
+  return renderTeacherEnded(r);
+}
+
+function renderTeacherWaiting(r){
+  const studentsHtml = state.students.length
+    ? state.students.map(s=>`<li class="participant"><span>${esc(s.name)}</span><span class="pill">예산 ${s.remainingBudget}</span></li>`).join('')
+    : `<li class="muted" style="list-style:none;">아직 참여한 학생이 없어요.</li>`;
+
+  const pending = state.proposals.filter(p=>p.status==='pending');
+  const proposalsHtml = pending.length
+    ? pending.map(p=>`
+      <div class="proposal-card" data-proposal-id="${p.id}">
+        <div class="proposal-head">
+          <strong>${esc(p.valueName)}</strong>
+          <span class="pill wait">${esc(p.studentName)} 제안</span>
+        </div>
+        <p class="muted" style="margin:4px 0 8px;">${esc(p.desc || '(설명 없음)')}</p>
+        <div class="row">
+          <button class="btn small gold" data-approve="${p.id}">목록에 추가</button>
+          <button class="btn small secondary" data-reject="${p.id}">거절</button>
+        </div>
+      </div>
+    `).join('')
+    : `<p class="muted">아직 들어온 제안이 없어요.</p>`;
+
+  const itemsHtml = r.items.map((it,i)=>`<li class="muted" style="list-style:none; padding:4px 0;">${i+1}. <strong style="color:var(--ink)">${esc(it.name)}</strong> · 시작가 ${it.price} — ${esc(it.desc)}</li>`).join('');
+
+  return `
+  <div class="topbar">
+    <span class="eyebrow">대기실</span>
+    <button class="linkbtn" data-go="home">방 나가기</button>
+  </div>
+
+  <div class="center" style="margin-bottom:18px;">
+    <p class="eyebrow">방 코드</p>
+    <div class="badge">${r.code}</div>
+    <p class="muted" style="margin-top:10px;">학생들에게 이 코드를 알려주세요</p>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;">
+    <h3 style="font-size:15px; margin-bottom:10px;">참여 학생 (<span id="studentCount">${state.students.length}</span>명)</h3>
+    <ul class="list-plain" id="studentListUl">${studentsHtml}</ul>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;">
+    <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:10px;">
+      <h3 style="font-size:15px;">학생 제안 (<span id="proposalCount">${state.proposals.length}</span>/${r.maxProposals})</h3>
+      ${pending.length ? `<span class="pill wait">대기중 ${pending.length}건</span>` : ''}
+    </div>
+    <div id="proposalListDiv" class="stack">${proposalsHtml}</div>
+  </div>
+
+  <div class="card">
+    <h3 style="font-size:15px; margin-bottom:8px;">경매 목록 (${r.items.length}개)</h3>
+    <ul style="padding:0; margin:0;">${itemsHtml}</ul>
+  </div>
+
+  <button class="btn seal block" id="startAuctionBtn" style="margin-top:22px; padding:15px; font-size:16px;" ${r.items.length===0?'disabled':''}>경매 시작하기</button>
+  `;
+}
+
+function renderTeacherAuction(r){
+  const idx = r.currentIndex;
+  const item = r.items[idx];
+  const b = state.bid;
+  const status = b ? b.status : 'open';
+  const historyHtml = (b && b.history && b.history.length)
+    ? b.history.slice().reverse().slice(0,8).map(h=>`<div class="history-row"><span>${esc(h.name)}</span><span>${h.amount}</span></div>`).join('')
+    : `<p class="muted" style="font-size:13px;">입찰 기록이 없습니다.</p>`;
+
+  return `
+  <div class="topbar">
+    <span class="eyebrow">경매 진행 · 방 ${r.code}</span>
+    <span class="pill">${idx+1} / ${r.items.length}</span>
+  </div>
+
+  <div class="auction-stage">
+    <p class="eyebrow">지금 경매 중인 가치</p>
+    <div class="value-name">${esc(item.name)}</div>
+    <div class="value-desc">${esc(item.desc)}</div>
+
+    <div id="bidAreaDiv">${renderBidArea(b, item, status)}</div>
+
+    <div class="row" style="justify-content:center;" id="teacherControlsRow">${renderTeacherControls(b, status)}</div>
+  </div>
+
+  <div class="card" style="margin-top:16px;">
+    <h3 style="font-size:14px; margin-bottom:6px;">입찰 기록</h3>
+    <div id="teacherHistory">${historyHtml}</div>
+  </div>
+
+  <button class="btn secondary block" id="nextItemBtn" style="margin-top:18px;">다음 가치로 넘어가기 →</button>
+  <p class="muted center" style="margin-top:10px; font-size:12.5px;">'다음 가치로'를 누르면 진행 상태와 상관없이 다음 항목으로 이동합니다.</p>
+  `;
+}
+
+function renderBidArea(b, item, status){
+  if(status==='countdown'){
+    return `
+      <div class="bid-display" style="justify-content:center;">
+        <div class="center" style="width:100%;">
+          <div style="font-size:12px; opacity:.8;">낙찰자 발표까지</div>
+          <div class="amt" id="countdownNum" style="font-size:46px;">5</div>
+        </div>
+      </div>
+      <p class="muted center" style="font-size:13px;">가장 높은 금액을 적어낸 친구에게 낙찰됩니다…</p>
+    `;
+  }
+  if(status==='sold'){
+    return `
+      <div class="bid-display" style="background:var(--seal); justify-content:center;">
+        <div class="center" style="width:100%;">
+          <div style="font-size:12px; opacity:.85;">낙찰</div>
+          <div class="amt" style="color:#fff1ec;">${esc(b.soldName || '')}</div>
+          <div class="who" style="opacity:.9;">${b.soldPrice != null ? b.soldPrice + 'P' : ''}</div>
+        </div>
+      </div>
+    `;
+  }
+  const highBid = b ? b.highBid : item.price;
+  const who = b && b.highBidderName ? b.highBidderName : '입찰 없음';
+  return `
+    <div class="bid-display">
+      <div>
+        <div style="font-size:12px; opacity:.75;">현재 최고가</div>
+        <div class="amt" id="teacherHighBid">${highBid}</div>
+      </div>
+      <div class="who" id="teacherHighBidder">${esc(who)}</div>
+    </div>
+  `;
+}
+
+function renderTeacherControls(b, status){
+  if(status==='countdown' || status==='sold') return '';
+  return `
+    <button class="btn gold" id="finalizeBtn" ${!(b && b.highBidderId)?'disabled':''}>낙찰 대기</button>
+    <button class="btn secondary" id="skipBtn">유찰(패스)</button>
+  `;
+}
+
+function renderConfetti(){
+  const colors = ['var(--gold)','var(--seal)','var(--green)','var(--gold-light)','var(--ink)'];
+  let pieces = '';
+  for(let i=0;i<22;i++){
+    const left = Math.random()*100;
+    const delay = (Math.random()*0.5).toFixed(2);
+    const dur = (2 + Math.random()*0.8).toFixed(2);
+    const color = colors[i % colors.length];
+    const rot = Math.random() > 0.5 ? '2px' : '50%';
+    pieces += `<span class="confetti-piece" style="left:${left}%; background:${color}; animation-delay:${delay}s; animation-duration:${dur}s; border-radius:${rot};"></span>`;
+  }
+  return `<div class="confetti-layer">${pieces}</div>`;
+}
+
+function renderTeacherEnded(r){
+  let rows = '';
+  let soldCount = 0, totalSpent = 0;
+  state.students.forEach(s=>{
+    if(s.won && s.won.length){
+      s.won.forEach(w=>{
+        rows += `<tr><td>${esc(s.name)}</td><td>${esc(w.name)}</td><td>${w.price}</td><td>${s.remainingBudget}</td></tr>`;
+        soldCount++; totalSpent += w.price;
+      });
+    } else {
+      rows += `<tr><td>${esc(s.name)}</td><td class="muted">낙찰 없음</td><td>—</td><td>${s.remainingBudget}</td></tr>`;
+    }
+  });
+
+  return `
+  <div class="topbar">
+    <span class="eyebrow">경매 종료 · 방 ${r.code}</span>
+    <button class="linkbtn" data-go="home">처음으로</button>
+  </div>
+
+  <div class="celebrate-wrap">
+    ${renderConfetti()}
+    <h2>수고 많았어요! 🎉</h2>
+    <p>모든 가치의 경매가 끝났습니다. 학생들이 어떤 가치에 얼마의 값을 매겼는지 함께 살펴볼까요?</p>
+  </div>
+
+  <div class="stat-row">
+    <div class="stat-box"><div class="num">${state.students.length}</div><div class="lbl">참여 학생</div></div>
+    <div class="stat-box"><div class="num">${soldCount}</div><div class="lbl">낙찰 건수</div></div>
+    <div class="stat-box"><div class="num">${totalSpent}</div><div class="lbl">총 낙찰가 합계</div></div>
+  </div>
+
+  <div class="card">
+    <table class="results">
+      <thead><tr><th>학생</th><th>낙찰 가치</th><th>낙찰가</th><th>남은 예산</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="4" class="muted">기록이 없습니다.</td></tr>'}</tbody>
+    </table>
+  </div>
+
+  <div class="card" style="margin-top:18px;">
+    <h3 style="font-size:15px; margin-bottom:8px;">구글 시트로 보내기</h3>
+    <p class="muted" style="margin-bottom:10px;">Apps Script 웹앱 URL을 붙여넣으면 결과를 시트에 자동으로 기록합니다. 아래 채팅에서 설정 방법을 안내해 드렸어요.</p>
+    <label class="field-label">웹앱 URL</label>
+    <input type="text" id="webhookInput" placeholder="https://script.google.com/macros/s/..." value="${esc(state.webhookUrl)}">
+    <button class="btn gold block" id="sendSheetBtn" style="margin-top:10px;">시트로 전송</button>
+  </div>
+  `;
+}
+
+/* ================= STUDENT: JOIN ================= */
+function renderStudentJoin(){
+  return `
+  <div class="topbar">
+    <button class="linkbtn" data-go="home">← 처음으로</button>
+  </div>
+  <h2 style="margin-bottom:4px;">학생으로 참여하기</h2>
+  <p class="muted" style="margin-bottom:18px;">선생님이 알려주신 방 코드와 이름을 입력하세요.</p>
+
+  <div class="card stack">
+    <div>
+      <label class="field-label">방 코드</label>
+      <input type="text" id="joinCode" inputmode="numeric" maxlength="4" placeholder="예: 4821">
+    </div>
+    <div>
+      <label class="field-label">이름</label>
+      <input type="text" id="joinName" placeholder="이름을 입력하세요" maxlength="12">
+    </div>
+    <button class="btn gold block" id="joinBtn" style="padding:14px;">입장하기</button>
+    <p class="muted" id="joinError" style="color:var(--seal); display:none;"></p>
+  </div>
+  `;
+}
+
+/* ================= STUDENT: ROOM ================= */
+function renderStudentRoom(){
+  const r = state.room;
+  if(!r) return `<div class="center muted" style="padding:60px 0;">불러오는 중…</div>`;
+  if(r.status==='waiting') return renderStudentWaiting(r);
+  if(r.status==='auction') return renderStudentAuction(r);
+  return renderStudentEnded(r);
+}
+
+function myStudent(){
+  return state.students.find(s=>s.id===state.studentId);
+}
+
+function renderStudentWaiting(r){
+  const me = myStudent();
+  const budget = me ? me.remainingBudget : r.budget;
+  const myProposals = state.proposals.filter(p=>p.studentId===state.studentId);
+  const myPropHtml = myProposals.length
+    ? myProposals.map(p=>{
+        const pillClass = p.status==='approved' ? 'ok' : p.status==='rejected' ? 'no' : 'wait';
+        const label = p.status==='approved' ? '채택됨' : p.status==='rejected' ? '거절됨' : '대기중';
+        return `<div class="proposal-card"><div class="proposal-head"><strong>${esc(p.valueName)}</strong><span class="pill ${pillClass}">${label}</span></div></div>`;
+      }).join('')
+    : `<p class="muted" style="font-size:13px;">아직 제안한 가치가 없어요.</p>`;
+
+  return `
+  <div class="topbar">
+    <span class="eyebrow">대기실 · 방 ${r.code}</span>
+    <span class="pill">${esc(state.studentName)}</span>
+  </div>
+
+  <div class="budget-strip">
+    <span>내 예산</span>
+    <b>${budget}</b>
+  </div>
+
+  <div class="card center" style="padding:26px 20px;">
+    <p class="eyebrow" style="margin-bottom:6px;">선생님이 경매를 시작하면</p>
+    <h3 style="font-size:17px;">자동으로 경매 화면으로 이동합니다</h3>
+    <p class="muted" style="margin-top:8px;">잠시만 기다려 주세요.</p>
+  </div>
+
+  <div class="card" id="proposeCard" style="margin-top:16px;">
+    ${renderProposeForm(r)}
+  </div>
+
+  <div class="card" style="margin-top:16px;">
+    <h3 style="font-size:15px; margin-bottom:8px;">내가 제안한 가치</h3>
+    <div id="myProposalsDiv" class="stack">${myPropHtml}</div>
+  </div>
+  `;
+}
+
+function renderStudentAuction(r){
+  const idx = r.currentIndex;
+  const item = r.items[idx];
+  const b = state.bid;
+  const status = b ? b.status : 'open';
+  const me = myStudent();
+  const budget = me ? me.remainingBudget : 0;
+
+  return `
+  <div class="topbar">
+    <span class="eyebrow">경매 중 · ${idx+1}/${r.items.length}</span>
+    <span class="pill">${esc(state.studentName)}</span>
+  </div>
+
+  <div class="budget-strip">
+    <span>내 남은 예산</span>
+    <b id="studentBudgetDisp">${budget}</b>
+  </div>
+
+  <div class="auction-stage">
+    <p class="eyebrow">지금 경매 중인 가치</p>
+    <div class="value-name">${esc(item.name)}</div>
+    <div class="value-desc">${esc(item.desc)}</div>
+
+    <div id="bidAreaDiv">${renderBidArea(b, item, status)}</div>
+
+    <div id="studentBidControls">${renderStudentBidControls(r, b, item, status, me)}</div>
+  </div>
+
+  <div class="card" style="margin-top:16px;">
+    <h3 style="font-size:14px; margin-bottom:6px;">내가 얻은 가치</h3>
+    <div id="myWonDiv">${renderMyWon(me)}</div>
+  </div>
+  `;
+}
+
+function renderStudentBidControls(r, b, item, status, me){
+  const maxItems = r.maxItems || 3;
+  if(me && me.won && me.won.length >= maxItems){
+    return `<p class="muted center" style="margin-top:14px;">이미 ${maxItems}개의 가치를 모두 획득했어요. 이번 경매는 여기까지예요!</p>`;
+  }
+  if(status==='countdown'){
+    return `<p class="muted center" style="margin-top:14px; font-size:13px;">입찰이 마감됐어요. 낙찰자를 기다려 주세요.</p>`;
+  }
+  if(status==='sold'){
+    return `<p class="muted center" style="margin-top:14px; font-size:13px;">낙찰이 끝났어요. 선생님이 다음 가치로 넘어갈 거예요.</p>`;
+  }
+  const highBid = b ? b.highBid : item.price;
+  const minNext = highBid + 10;
+  return `
+    <div class="stack" style="max-width:280px; margin:0 auto;">
+      <input type="number" id="bidAmountInput" placeholder="입찰 금액" value="${minNext}" min="${highBid+1}" max="${me ? me.remainingBudget : 0}">
+      <div class="bid-quick">
+        <button class="btn small secondary" data-quick="10">+10</button>
+        <button class="btn small secondary" data-quick="50">+50</button>
+        <button class="btn small secondary" data-quick="100">+100</button>
+      </div>
+      <button class="btn gold block" id="placeBidBtn">입찰하기</button>
+      <p class="muted" id="bidError" style="color:var(--seal); display:none; font-size:12.5px;"></p>
+    </div>
+  `;
+}
+
+function renderProposeForm(r){
+  const total = state.proposals.length;
+  const max = r.maxProposals || 0;
+  const remaining = max - total;
+  if(max <= 0){
+    return `<h3 style="font-size:15px; margin-bottom:6px;">가치 제안</h3><p class="muted">이번 경매는 선생님이 정한 고정 목록으로만 진행돼요.</p>`;
+  }
+  if(remaining <= 0){
+    return `<h3 style="font-size:15px; margin-bottom:6px;">가치 제안</h3><p class="muted">제안 접수가 마감됐어요 (${total}/${max}). 이미 들어온 제안 중 채택된 항목이 경매 목록에 추가됩니다.</p>`;
+  }
+  return `
+    <h3 style="font-size:15px; margin-bottom:4px;">추가하고 싶은 가치가 있나요?</h3>
+    <p class="muted" style="margin-bottom:10px;">선생님이 승인하면 경매 목록에 추가돼요. (남은 제안 자리 ${remaining}/${max})</p>
+    <div class="stack">
+      <input type="text" id="proposeValueName" placeholder="가치 이름 (예: 우정을 나눌 권리)" maxlength="20">
+      <textarea id="proposeValueDesc" placeholder="이 가치가 왜 소중한지 짧게 설명해 주세요" maxlength="120" style="min-height:56px;"></textarea>
+      <button class="btn secondary block" id="proposeBtn">제안하기</button>
+    </div>
+  `;
+}
+
+function renderMyWon(me){
+  if(!me || !me.won || !me.won.length) return `<p class="muted" style="font-size:13px;">아직 낙찰받은 가치가 없어요.</p>`;
+  return `<ul class="list-plain">${me.won.map(w=>`<li class="participant"><span>${esc(w.name)}</span><span class="pill">${w.price}</span></li>`).join('')}</ul>`;
+}
+
+function renderStudentEnded(r){
+  const me = myStudent();
+  const wonCount = me && me.won ? me.won.length : 0;
+  return `
+  <div class="topbar">
+    <span class="eyebrow">경매 종료 · 방 ${r.code}</span>
+  </div>
+
+  <div class="celebrate-wrap">
+    ${renderConfetti()}
+    <h2>수고했어요, ${esc(state.studentName)}님! 🎉</h2>
+    <p>${wonCount > 0 ? `이번 경매에서 ${wonCount}개의 가치를 얻었어요. 어떤 가치를 골랐는지 확인해보세요.` : '이번엔 낙찰받은 가치가 없었지만, 어떤 가치에 마음이 갔는지 되돌아보는 것도 의미 있어요.'}</p>
+  </div>
+
+  <div class="card">
+    <div class="budget-strip" style="margin-bottom:14px;">
+      <span>남은 예산</span><b>${me ? me.remainingBudget : '-'}</b>
+    </div>
+    ${renderMyWon(me)}
+  </div>
+  `;
+}
+
+/* ================= POLLING ================= */
+function startTeacherPolling(){
+  tickTeacher();
+  state.pollHandle = setInterval(tickTeacher, 2000);
+}
+async function tickTeacher(){
+  if(!state.roomCode) return;
+  const r = await loadRoom(state.roomCode);
+  if(!r) return;
+  const prevStatus = state.room ? state.room.status : null;
+  const prevIdx = state.room ? state.room.currentIndex : null;
+  state.room = r;
+  state.students = await loadStudents(state.roomCode);
+  state.proposals = await loadProposals(state.roomCode);
+  if(r.status==='auction'){
+    state.bid = await loadBid(state.roomCode, r.currentIndex);
+  }
+  const structureChanged = (prevStatus !== r.status) || (prevIdx !== r.currentIndex);
+  if(structureChanged || document.getElementById('app').dataset.screenFor !== state.screen){
+    render();
+  } else {
+    updateTeacherLive();
+  }
+}
+function updateTeacherLive(){
+  const r = state.room;
+  if(!r) return;
+  if(r.status==='waiting'){
+    const countEl = document.getElementById('studentCount');
+    if(countEl) countEl.textContent = state.students.length;
+    const ul = document.getElementById('studentListUl');
+    if(ul){
+      ul.innerHTML = state.students.length
+        ? state.students.map(s=>`<li class="participant"><span>${esc(s.name)}</span><span class="pill">예산 ${s.remainingBudget}</span></li>`).join('')
+        : `<li class="muted" style="list-style:none;">아직 참여한 학생이 없어요.</li>`;
+    }
+    const pending = state.proposals.filter(p=>p.status==='pending');
+    const pc = document.getElementById('proposalCount');
+    if(pc) pc.textContent = state.proposals.length;
+    const pd = document.getElementById('proposalListDiv');
+    if(pd){
+      pd.innerHTML = pending.length ? pending.map(p=>`
+        <div class="proposal-card" data-proposal-id="${p.id}">
+          <div class="proposal-head">
+            <strong>${esc(p.valueName)}</strong>
+            <span class="pill wait">${esc(p.studentName)} 제안</span>
+          </div>
+          <p class="muted" style="margin:4px 0 8px;">${esc(p.desc || '(설명 없음)')}</p>
+          <div class="row">
+            <button class="btn small gold" data-approve="${p.id}">목록에 추가</button>
+            <button class="btn small secondary" data-reject="${p.id}">거절</button>
+          </div>
+        </div>
+      `).join('') : `<p class="muted">아직 들어온 제안이 없어요.</p>`;
+      attachHandlers();
+    }
+  } else if(r.status==='auction'){
+    const b = state.bid;
+    const item = r.items[r.currentIndex];
+    const status = b ? b.status : 'open';
+    const bidAreaDiv = document.getElementById('bidAreaDiv');
+    if(bidAreaDiv) bidAreaDiv.innerHTML = renderBidArea(b, item, status);
+    const controlsRow = document.getElementById('teacherControlsRow');
+    if(controlsRow){ controlsRow.innerHTML = renderTeacherControls(b, status); attachHandlers(); }
+    const hist = document.getElementById('teacherHistory');
+    if(hist){
+      hist.innerHTML = (b && b.history && b.history.length)
+        ? b.history.slice().reverse().slice(0,8).map(h=>`<div class="history-row"><span>${esc(h.name)}</span><span>${h.amount}</span></div>`).join('')
+        : `<p class="muted" style="font-size:13px;">입찰 기록이 없습니다.</p>`;
+    }
+    manageCountdownTicker(status, b);
+  }
+}
+
+function startStudentPolling(){
+  tickStudent();
+  state.pollHandle = setInterval(tickStudent, 1500);
+}
+async function tickStudent(){
+  if(!state.roomCode) return;
+  const r = await loadRoom(state.roomCode);
+  if(!r) return;
+  const prevStatus = state.room ? state.room.status : null;
+  const prevIdx = state.room ? state.room.currentIndex : null;
+  state.room = r;
+  const meRaw = await sGet(K.student(state.roomCode, state.studentId), true);
+  const me = meRaw ? JSON.parse(meRaw) : null;
+  state.students = me ? [me] : [];
+  if(r.status==='waiting'){
+    state.proposals = await loadProposals(state.roomCode);
+  }
+  if(r.status==='auction'){
+    state.bid = await loadBid(state.roomCode, r.currentIndex);
+  }
+  const structureChanged = (prevStatus !== r.status) || (prevIdx !== r.currentIndex);
+  if(structureChanged){
+    render();
+  } else {
+    updateStudentLive();
+  }
+}
+function updateStudentLive(){
+  const r = state.room;
+  if(!r) return;
+  const me = myStudent();
+  if(r.status==='waiting'){
+    const myProposals = state.proposals.filter(p=>p.studentId===state.studentId);
+    const div = document.getElementById('myProposalsDiv');
+    if(div){
+      div.innerHTML = myProposals.length
+        ? myProposals.map(p=>{
+            const pillClass = p.status==='approved' ? 'ok' : p.status==='rejected' ? 'no' : 'wait';
+            const label = p.status==='approved' ? '채택됨' : p.status==='rejected' ? '거절됨' : '대기중';
+            return `<div class="proposal-card"><div class="proposal-head"><strong>${esc(p.valueName)}</strong><span class="pill ${pillClass}">${label}</span></div></div>`;
+          }).join('')
+        : `<p class="muted" style="font-size:13px;">아직 제안한 가치가 없어요.</p>`;
+    }
+    const proposeCard = document.getElementById('proposeCard');
+    // Only refresh the form when it's not mid-edit (no focused input inside it) to avoid disrupting typing
+    if(proposeCard && document.activeElement && !proposeCard.contains(document.activeElement)){
+      proposeCard.innerHTML = renderProposeForm(r);
+      attachHandlers();
+    }
+  } else if(r.status==='auction'){
+    const b = state.bid;
+    const item = r.items[r.currentIndex];
+    const status = b ? b.status : 'open';
+    const bidAreaDiv = document.getElementById('bidAreaDiv');
+    if(bidAreaDiv) bidAreaDiv.innerHTML = renderBidArea(b, item, status);
+    const budgetDisp = document.getElementById('studentBudgetDisp');
+    if(budgetDisp && me) budgetDisp.textContent = me.remainingBudget;
+    // Only refresh bid controls when the user isn't actively typing a bid amount
+    const controlsWrap = document.getElementById('studentBidControls');
+    if(controlsWrap && document.activeElement && document.activeElement.id !== 'bidAmountInput'){
+      controlsWrap.innerHTML = renderStudentBidControls(r, b, item, status, me);
+      attachHandlers();
+    }
+    const wonDiv = document.getElementById('myWonDiv');
+    if(wonDiv) wonDiv.innerHTML = renderMyWon(me);
+    manageCountdownTicker(status, b);
+  }
+}
+
+/* ================= EVENT HANDLERS ================= */
+function attachHandlers(){
+  document.querySelectorAll('[data-go]').forEach(el=>{
+    el.onclick = () => goto(el.getAttribute('data-go'));
+  });
+
+  // Teacher create
+  const addItemBtn = document.getElementById('addItemBtn');
+  if(addItemBtn) addItemBtn.onclick = () => {
+    state.draftItems = collectDraftItemsFromDOM();
+    document.getElementById('budgetInput') && (state.draftBudget = parseInt(document.getElementById('budgetInput').value,10) || state.draftBudget);
+    document.getElementById('maxProposalsInput') && (state.draftMaxProposals = parseInt(document.getElementById('maxProposalsInput').value,10) ?? state.draftMaxProposals);
+    document.getElementById('maxItemsInput') && (state.draftMaxItems = parseInt(document.getElementById('maxItemsInput').value,10) || state.draftMaxItems);
+    state.draftItems.push({id:uid(), name:'', desc:'', price:50});
+    render();
+  };
+  const resetBtn = document.getElementById('resetDefaultsBtn');
+  if(resetBtn) resetBtn.onclick = () => {
+    state.draftItems = DEFAULT_VALUES.map(v=>({id:uid(), ...v}));
+    render();
+  };
+  document.querySelectorAll('[data-remove-item]').forEach(el=>{
+    el.onclick = () => {
+      state.draftItems = collectDraftItemsFromDOM().filter(it=>it.id !== el.getAttribute('data-remove-item'));
+      render();
+    };
+  });
+  const createRoomBtn = document.getElementById('createRoomBtn');
+  if(createRoomBtn) createRoomBtn.onclick = async () => {
+    const items = collectDraftItemsFromDOM();
+    if(items.length===0){ toast('가치 항목을 1개 이상 입력해주세요.'); return; }
+    const budget = parseInt(document.getElementById('budgetInput').value,10) || 1000;
+    const maxItems = Math.max(1, parseInt(document.getElementById('maxItemsInput').value,10) || 3);
+    const maxProposalsRaw = document.getElementById('maxProposalsInput').value;
+    const maxProposals = maxProposalsRaw==='' ? DEFAULT_MAX_PROPOSALS : Math.max(0, parseInt(maxProposalsRaw,10) || 0);
+    createRoomBtn.disabled = true; createRoomBtn.textContent='만드는 중…';
+    const code = roomCodeGen();
+    const room = { code, status:'waiting', budget, maxProposals, maxItems, items, currentIndex:-1, createdAt:Date.now() };
+    await saveRoom(room);
+    state.roomCode = code;
+    state.room = room;
+    state.students = [];
+    state.proposals = [];
+    goto('teacher-room');
+  };
+
+  // Teacher waiting: proposals
+  document.querySelectorAll('[data-approve]').forEach(el=>{
+    el.onclick = async () => {
+      const pid = el.getAttribute('data-approve');
+      const p = state.proposals.find(x=>x.id===pid);
+      if(!p) return;
+      p.status='approved';
+      await sSet(K.proposal(state.roomCode, pid), JSON.stringify(p), true);
+      const r = await loadRoom(state.roomCode);
+      r.items.push({id:uid(), name:p.valueName, desc:p.desc||'', price:50});
+      await saveRoom(r);
+      state.room = r;
+      toast('가치 목록에 추가했어요.');
+      render();
+    };
+  });
+  document.querySelectorAll('[data-reject]').forEach(el=>{
+    el.onclick = async () => {
+      const pid = el.getAttribute('data-reject');
+      const p = state.proposals.find(x=>x.id===pid);
+      if(!p) return;
+      p.status='rejected';
+      await sSet(K.proposal(state.roomCode, pid), JSON.stringify(p), true);
+      render();
+    };
+  });
+
+  const startAuctionBtn = document.getElementById('startAuctionBtn');
+  if(startAuctionBtn) startAuctionBtn.onclick = async () => {
+    const r = await loadRoom(state.roomCode);
+    r.status='auction';
+    r.currentIndex=0;
+    await saveRoom(r);
+    await saveBid(state.roomCode, 0, {itemIndex:0, highBid:r.items[0].price, highBidderId:null, highBidderName:null, history:[], status:'open', countdownEndAt:null, soldName:null, soldPrice:null});
+    state.room = r;
+    render();
+  };
+
+  // Teacher auction controls
+  const finalizeBtn = document.getElementById('finalizeBtn');
+  if(finalizeBtn) finalizeBtn.onclick = async () => {
+    const r = state.room;
+    const capturedItemIndex = r.currentIndex;
+    const capturedRoomCode = state.roomCode;
+    const bFresh = await loadBid(capturedRoomCode, capturedItemIndex);
+    if(!bFresh || !bFresh.highBidderId){ toast('입찰자가 없습니다.'); return; }
+    bFresh.status = 'countdown';
+    bFresh.countdownEndAt = Date.now() + 5000;
+    await saveBid(capturedRoomCode, capturedItemIndex, bFresh);
+    state.bid = bFresh;
+    render();
+    manageCountdownTicker('countdown', bFresh);
+
+    const capturedWinnerId = bFresh.highBidderId;
+    const capturedAmount = bFresh.highBid;
+
+    setTimeout(async () => {
+      const latestRoom = await loadRoom(capturedRoomCode);
+      if(!latestRoom || latestRoom.currentIndex !== capturedItemIndex) return; // teacher already moved on
+      const latestBid = await loadBid(capturedRoomCode, capturedItemIndex);
+      if(!latestBid || latestBid.status !== 'countdown') return; // already resolved elsewhere
+
+      const item = latestRoom.items[capturedItemIndex];
+      const maxItems = latestRoom.maxItems || 3;
+      const sRaw = await sGet(K.student(capturedRoomCode, capturedWinnerId), true);
+      if(!sRaw){
+        latestBid.status='open'; latestBid.countdownEndAt=null;
+        await saveBid(capturedRoomCode, capturedItemIndex, latestBid);
+      } else {
+        const stu = JSON.parse(sRaw);
+        stu.won = stu.won || [];
+        if(stu.won.length >= maxItems){
+          latestBid.status='open'; latestBid.countdownEndAt=null;
+          await saveBid(capturedRoomCode, capturedItemIndex, latestBid);
+          toast(`${stu.name}님은 이미 최대 ${maxItems}개를 획득해 낙찰이 취소됐어요.`);
+        } else {
+          stu.remainingBudget -= capturedAmount;
+          stu.won.push({itemId:item.id, name:item.name, price:capturedAmount});
+          await sSet(K.student(capturedRoomCode, stu.id), JSON.stringify(stu), true);
+          latestBid.status='sold';
+          latestBid.soldName = stu.name;
+          latestBid.soldPrice = capturedAmount;
+          await saveBid(capturedRoomCode, capturedItemIndex, latestBid);
+        }
+      }
+
+      if(state.roomCode === capturedRoomCode && state.room && state.room.currentIndex === capturedItemIndex){
+        state.bid = await loadBid(capturedRoomCode, capturedItemIndex);
+        state.students = await loadStudents(capturedRoomCode);
+        render();
+      }
+    }, 5200);
+  };
+  const skipBtn = document.getElementById('skipBtn');
+  if(skipBtn) skipBtn.onclick = async () => {
+    await advanceItem();
+  };
+  const nextItemBtn = document.getElementById('nextItemBtn');
+  if(nextItemBtn) nextItemBtn.onclick = async () => {
+    await advanceItem();
+  };
+
+  // Teacher ended: webhook
+  const sendSheetBtn = document.getElementById('sendSheetBtn');
+  if(sendSheetBtn) sendSheetBtn.onclick = async () => {
+    const url = document.getElementById('webhookInput').value.trim();
+    if(!url){ toast('웹앱 URL을 입력해주세요.'); return; }
+    state.webhookUrl = url;
+    await sSet('settings:sheet-webhook', url, false);
+    sendSheetBtn.disabled = true; sendSheetBtn.textContent='전송 중…';
+    const results = [];
+    state.students.forEach(s=>{
+      if(s.won && s.won.length){
+        s.won.forEach(w=> results.push({studentName:s.name, valueName:w.name, price:w.price, remainingBudget:s.remainingBudget}));
+      } else {
+        results.push({studentName:s.name, valueName:'', price:'', remainingBudget:s.remainingBudget});
+      }
+    });
+    try{
+      await fetch(url, {
+        method:'POST',
+        headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body: JSON.stringify({roomCode: state.roomCode, timestamp: new Date().toLocaleString('ko-KR'), results})
+      });
+      toast('구글 시트로 전송했어요. 시트를 확인해보세요.');
+    }catch(e){
+      toast('전송에 실패했어요. URL을 다시 확인해주세요.');
+    }
+    sendSheetBtn.disabled=false; sendSheetBtn.textContent='시트로 전송';
+  };
+
+  // Student join
+  const joinBtn = document.getElementById('joinBtn');
+  if(joinBtn) joinBtn.onclick = async () => {
+    const code = document.getElementById('joinCode').value.trim();
+    const name = document.getElementById('joinName').value.trim();
+    const errEl = document.getElementById('joinError');
+    errEl.style.display='none';
+    if(!code || !name){ errEl.textContent='방 코드와 이름을 모두 입력해주세요.'; errEl.style.display='block'; return; }
+    joinBtn.disabled=true; joinBtn.textContent='입장 중…';
+    const r = await loadRoom(code);
+    if(!r){
+      errEl.textContent='방을 찾을 수 없어요. 코드를 확인해주세요.'; errEl.style.display='block';
+      joinBtn.disabled=false; joinBtn.textContent='입장하기';
+      return;
+    }
+    const sid = uid();
+    const student = {id:sid, name, budget:r.budget, remainingBudget:r.budget, won:[], joinedAt:Date.now()};
+    await sSet(K.student(code, sid), JSON.stringify(student), true);
+    state.roomCode = code;
+    state.studentId = sid;
+    state.studentName = name;
+    state.room = r;
+    goto('student-room');
+  };
+
+  // Student waiting: propose
+  const proposeBtn = document.getElementById('proposeBtn');
+  if(proposeBtn) proposeBtn.onclick = async () => {
+    const nameEl = document.getElementById('proposeValueName');
+    const descEl = document.getElementById('proposeValueDesc');
+    const vname = nameEl.value.trim();
+    if(!vname){ toast('가치 이름을 입력해주세요.'); return; }
+    proposeBtn.disabled = true;
+    const freshRoom = await loadRoom(state.roomCode);
+    const freshProposals = await loadProposals(state.roomCode);
+    if(freshProposals.length >= (freshRoom.maxProposals || 0)){
+      toast('제안 접수가 마감됐어요.');
+      state.room = freshRoom;
+      state.proposals = freshProposals;
+      const proposeCard = document.getElementById('proposeCard');
+      if(proposeCard) proposeCard.innerHTML = renderProposeForm(freshRoom);
+      proposeBtn.disabled = false;
+      return;
+    }
+    const pid = uid();
+    const p = {id:pid, studentId:state.studentId, studentName:state.studentName, valueName:vname, desc:descEl.value.trim(), status:'pending', createdAt:Date.now()};
+    await sSet(K.proposal(state.roomCode, pid), JSON.stringify(p), true);
+    toast('선생님께 제안을 보냈어요.');
+    state.proposals = await loadProposals(state.roomCode);
+    render();
+  };
+
+  // Student auction: quick bid buttons
+  document.querySelectorAll('[data-quick]').forEach(el=>{
+    el.onclick = () => {
+      const inc = parseInt(el.getAttribute('data-quick'),10);
+      const input = document.getElementById('bidAmountInput');
+      const b = state.bid;
+      const item = state.room.items[state.room.currentIndex];
+      const base = b ? b.highBid : item.price;
+      input.value = base + inc;
+    };
+  });
+  const placeBidBtn = document.getElementById('placeBidBtn');
+  if(placeBidBtn) placeBidBtn.onclick = async () => {
+    const errEl = document.getElementById('bidError');
+    errEl.style.display='none';
+    const amount = parseInt(document.getElementById('bidAmountInput').value,10);
+    const r = state.room;
+    const idx = r.currentIndex;
+    const fresh = await loadBid(state.roomCode, idx);
+    if(fresh && fresh.status !== 'open'){
+      errEl.textContent = '입찰이 마감됐어요.'; errEl.style.display='block';
+      state.bid = fresh; render(); return;
+    }
+    const meRaw = await sGet(K.student(state.roomCode, state.studentId), true);
+    const me = meRaw ? JSON.parse(meRaw) : null;
+    const maxItems = r.maxItems || 3;
+    if(me && me.won && me.won.length >= maxItems){
+      errEl.textContent = `이미 최대 ${maxItems}개를 획득해 더 입찰할 수 없어요.`; errEl.style.display='block'; return;
+    }
+    const currentHigh = fresh ? fresh.highBid : r.items[idx].price;
+    if(!amount || amount <= currentHigh){
+      errEl.textContent = `현재가(${currentHigh})보다 높은 금액을 입력해주세요.`; errEl.style.display='block'; return;
+    }
+    if(!me || amount > me.remainingBudget){
+      errEl.textContent = '남은 예산보다 많이 입찰할 수 없어요.'; errEl.style.display='block'; return;
+    }
+    const b = fresh || {itemIndex:idx, highBid:r.items[idx].price, highBidderId:null, highBidderName:null, history:[], status:'open', countdownEndAt:null, soldName:null, soldPrice:null};
+    b.highBid = amount;
+    b.highBidderId = state.studentId;
+    b.highBidderName = state.studentName;
+    b.history = b.history || [];
+    b.history.push({studentId:state.studentId, name:state.studentName, amount, ts:Date.now()});
+    await saveBid(state.roomCode, idx, b);
+    state.bid = b;
+    toast('입찰했어요!');
+    render();
+  };
+}
+
+async function advanceItem(){
+  if(state.countdownHandle){ clearInterval(state.countdownHandle); state.countdownHandle=null; }
+  const r = await loadRoom(state.roomCode);
+  const nextIdx = r.currentIndex + 1;
+  if(nextIdx >= r.items.length){
+    r.status='ended';
+    await saveRoom(r);
+    state.room = r;
+    state.students = await loadStudents(state.roomCode);
+    render();
+    return;
+  }
+  r.currentIndex = nextIdx;
+  await saveRoom(r);
+  await saveBid(state.roomCode, nextIdx, {itemIndex:nextIdx, highBid:r.items[nextIdx].price, highBidderId:null, highBidderName:null, history:[], status:'open', countdownEndAt:null, soldName:null, soldPrice:null});
+  state.room = r;
+  state.bid = await loadBid(state.roomCode, nextIdx);
+  render();
+}
+
+/* ---------- init ---------- */
+(async function init(){
+  const saved = await sGet('settings:sheet-webhook', false);
+  if(saved) state.webhookUrl = saved;
+  render();
+})();
+
+})();
+</script>
+</body>
+</html>
