@@ -188,6 +188,7 @@ window.addEventListener('DOMContentLoaded', function() {
       toastTimer = setTimeout(()=>{ t.style.display='none'; }, 2600);
     }
 
+    // 기본 가치 30종 전체 목록
     const DEFAULT_VALUES = [
       {name:'생명권', desc:'모든 사람은 생명을 존중받고 안전하게 살아갈 권리가 있다', price:50},
       {name:'자유권', desc:'자신의 생각과 행동을 스스로 결정할 자유', price:50},
@@ -196,9 +197,29 @@ window.addEventListener('DOMContentLoaded', function() {
       {name:'교육받을 권리', desc:'배우고 성장할 기회를 보장받을 권리', price:50},
       {name:'사생활의 자유', desc:'개인의 사적인 영역을 존중받을 권리', price:50},
       {name:'표현의 자유', desc:'자신의 생각을 자유롭게 말하고 표현할 권리', price:50},
-      {name:'노동의 권리', desc:'정당한 대가를 받으며 일할 권리', price:50},
+      {name:'노동의 권리', desc:'정당한 대가를 받으며 안전하게 일할 권리', price:50},
       {name:'참정권', desc:'정치에 참여하고 투표할 권리', price:50},
-      {name:'안전하게 살 권리', desc:'폭력과 위험으로부터 보호받을 권리', price:50}
+      {name:'안전하게 살 권리', desc:'폭력과 위험으로부터 보호받을 권리', price:50},
+      {name:'환경권', desc:'깨끗하고 쾌적한 환경에서 건강하게 살아갈 권리', price:50},
+      {name:'문화를 누릴 권리', desc:'다양한 문화와 예술을 자유롭게 즐길 권리', price:50},
+      {name:'재산권', desc:'자신의 재산을 정당하게 갖고 지킬 권리', price:50},
+      {name:'신체의 자유', desc:'부당하게 구속되거나 신체적 침해를 당하지 않을 권리', price:50},
+      {name:'양심과 종교의 자유', desc:'자신의 신념과 믿음을 지키고 표현할 권리', price:50},
+      {name:'휴식과 여가의 권리', desc:'충분히 쉬고 재충전할 여유를 가질 권리', price:50},
+      {name:'가족을 구성할 권리', desc:'원하는 사람과 가정을 이루고 보호받을 권리', price:50},
+      {name:'도움을 요청할 권리', desc:'위기와 어려움에 처했을 때 사회적 구호를 받을 권리', price:50},
+      {name:'이동의 자유', desc:'자신이 원하는 곳으로 자유롭게 이동하고 거주할 권리', price:50},
+      {name:'비밀보장의 권리', desc:'통신과 편지의 비밀을 침해받지 않을 권리', price:50},
+      {name:'차별받지 않을 권리', desc:'성별, 장애, 인종 등 어떤 이유로도 부당한 불이익을 받지 않을 권리', price:50},
+      {name:'디지털 잊힐 권리', desc:'온라인 공간에서 원치 않는 개인정보나 기록의 삭제를 요구할 권리', price:50},
+      {name:'공정한 재판을 받을 권리', desc:'법 앞에서 편견 없이 공정하고 객관적인 재판을 보장받을 권리', price:50},
+      {name:'건강 및 의료권', desc:'질병이나 부상 시 차별 없이 적절한 의료 서비스와 돌봄을 받을 권리', price:50},
+      {name:'문화적 다양성 존중권', desc:'고유한 문화, 언어, 예술을 자유롭게 표현하고 인정받을 권리', price:50},
+      {name:'집회 및 결사의 자유', desc:'같은 뜻을 가진 사람들과 평화롭게 모이고 단체를 결성할 권리', price:50},
+      {name:'아동·청소년 보호권', desc:'모든 형태의 폭력, 학대, 착취로부터 특별한 보호와 돌봄을 받을 권리', price:50},
+      {name:'주거권', desc:'비바람을 피하고 인간다운 삶을 누릴 수 있는 안전한 보금자리를 가질 권리', price:50},
+      {name:'기후·지속가능권', desc:'미래 세대를 위해 파괴되지 않은 지구 환경을 누릴 권리', price:50},
+      {name:'알 권리 (정보 접근권)', desc:'시민으로서 사회의 중요한 공공 정보와 진실을 투명하게 알 권리', price:50}
     ];
 
     let state = {
@@ -209,7 +230,7 @@ window.addEventListener('DOMContentLoaded', function() {
       studentName:'',
       myStudentData: null,
       draftBudget:1000,
-      draftMaxProposals: 10,
+      draftMaxProposals: 20,
       draftMaxItems: 3,
       draftItems: DEFAULT_VALUES.map(v=>({id:uid(), name:v.name, desc:v.desc, price:v.price})),
       room:null,
@@ -229,7 +250,6 @@ window.addEventListener('DOMContentLoaded', function() {
           studentId: state.studentId || '',
           studentName: state.studentName || ''
         }));
-        // 최근 방 코드는 따로 영구 기록
         localStorage.setItem('last_teacher_room_code', state.roomCode);
       }
     }
@@ -282,7 +302,10 @@ window.addEventListener('DOMContentLoaded', function() {
         if(newRoom.status === 'auction' && (prevStatus !== 'auction' || prevIdx !== newRoom.currentIndex)){
           bindBidRealtime(code, newRoom.currentIndex);
         }
-        render();
+
+        if(prevStatus !== newRoom.status || prevIdx !== newRoom.currentIndex){
+          render();
+        }
       });
       state.unsubscribers.push(unsubRoom);
 
@@ -290,15 +313,19 @@ window.addEventListener('DOMContentLoaded', function() {
         state.students = snap.docs.map(d => d.data());
         if(state.studentId){
           const me = state.students.find(s => s.id === state.studentId);
-          if(me) state.myStudentData = me;
+          if(me) {
+            state.myStudentData = me;
+            const bEl = document.getElementById('myBudgetNum');
+            if(bEl) bEl.textContent = me.remainingBudget;
+          }
         }
-        render();
+        updateStudentsDOM();
       });
       state.unsubscribers.push(unsubStudents);
 
       const unsubProposals = db.collection("rooms").doc(code).collection("proposals").orderBy("createdAt", "asc").onSnapshot((snap) => {
         state.proposals = snap.docs.map(d => d.data());
-        render();
+        updateProposalsDOM();
       });
       state.unsubscribers.push(unsubProposals);
     }
@@ -306,9 +333,75 @@ window.addEventListener('DOMContentLoaded', function() {
     function bindBidRealtime(code, idx){
       const unsubBid = db.collection("rooms").doc(code).collection("bids").doc(String(idx)).onSnapshot((snap) => {
         state.bid = snap.exists ? snap.data() : null;
-        render();
+        updateBidDOM();
       });
       state.unsubscribers.push(unsubBid);
+    }
+
+    function updateProposalsDOM(){
+      if(state.screen === 'student-room' && state.room?.status === 'waiting'){
+        const myProposals = state.proposals.filter(p => p.studentId === state.studentId);
+        const myPropDiv = document.getElementById('myProposalsList');
+        if(myPropDiv){
+          myPropDiv.innerHTML = myProposals.length
+            ? myProposals.map(p=>`<div class="proposal-card"><div class="proposal-head"><strong>${esc(p.valueName)}</strong><span class="pill ${p.status==='approved'?'ok':p.status==='rejected'?'no':'wait'}">${p.status==='approved'?'채택됨':p.status==='rejected'?'거절됨':'대기중'}</span></div></div>`).join('')
+            : `<p class="muted" style="font-size:13px;">아직 제안한 가치가 없어요.</p>`;
+        }
+      } else if(state.screen === 'teacher-room' && state.room?.status === 'waiting'){
+        const pending = state.proposals.filter(p=>p.status==='pending');
+        const pCountEl = document.getElementById('teacherProposalCount');
+        if(pCountEl) pCountEl.textContent = `${state.proposals.length}/${state.room.maxProposals}`;
+        const pListDiv = document.getElementById('teacherProposalList');
+        if(pListDiv){
+          pListDiv.innerHTML = pending.length
+            ? pending.map(p=>`
+              <div class="proposal-card">
+                <div class="proposal-head"><strong>${esc(p.valueName)}</strong><span class="pill wait">${esc(p.studentName)} 제안</span></div>
+                <p class="muted" style="margin:4px 0 8px;">${esc(p.desc || '(설명 없음)')}</p>
+                <div class="row">
+                  <button class="btn small gold" data-approve="${p.id}">목록에 추가</button>
+                  <button class="btn small secondary" data-reject="${p.id}">거절</button>
+                </div>
+              </div>
+            `).join('')
+            : `<p class="muted">아직 들어온 제안이 없어요.</p>`;
+          attachProposalActionHandlers();
+        }
+      }
+    }
+
+    function updateStudentsDOM(){
+      if(state.screen === 'teacher-room' && state.room?.status === 'waiting'){
+        const countEl = document.getElementById('teacherStudentCount');
+        if(countEl) countEl.textContent = `${state.students.length}명`;
+        const listUl = document.getElementById('teacherStudentList');
+        if(listUl){
+          listUl.innerHTML = state.students.length
+            ? state.students.map(s=>`<li class="participant"><span>${esc(s.name)}</span><span class="pill">예산 ${s.remainingBudget}</span></li>`).join('')
+            : `<li class="muted" style="list-style:none;">아직 참여한 학생이 없어요.</li>`;
+        }
+      }
+    }
+
+    function updateBidDOM(){
+      const r = state.room;
+      if(!r || r.status !== 'auction') return;
+      const idx = r.currentIndex;
+      const item = (r.items && r.items[idx]) ? r.items[idx] : { name:'가치', desc:'', price:50 };
+      const b = state.bid;
+      const status = b ? b.status : 'open';
+
+      const bidAreaDiv = document.getElementById('bidAreaDiv');
+      if(bidAreaDiv) bidAreaDiv.innerHTML = renderBidArea(b, item, status);
+
+      const histDiv = document.getElementById('teacherHistoryDiv');
+      if(histDiv && b && b.history){
+        histDiv.innerHTML = b.history.length
+          ? b.history.slice().reverse().slice(0,8).map(h=>`<div class="history-row"><span>${esc(h.name)}</span><span>${h.amount}</span></div>`).join('')
+          : `<p class="muted" style="font-size:13px;">입찰 기록이 없습니다.</p>`;
+      }
+
+      manageCountdownTicker(status, b);
     }
 
     function collectDraftItemsFromDOM(){
@@ -368,7 +461,6 @@ window.addEventListener('DOMContentLoaded', function() {
       <p class="muted" style="margin-bottom:20px;">이어서 진행할 방이 있다면 코드로 입장하거나, 새 방을 만드세요.</p>
 
       <div class="stack">
-        <!-- 기존 방 이어하기 (방 코드 직접 입력 또는 최근 코드 불러오기) -->
         <div class="card stack" style="border:1.5px solid var(--gold);">
           <span class="eyebrow" style="color:var(--gold-dark); font-weight:700;">기존 경매방 이어하기</span>
           <p class="muted" style="font-size:13px; margin:0;">기존 방 코드를 입력하면 대기실 및 경매 상태 그대로 복귀합니다.</p>
@@ -379,10 +471,9 @@ window.addEventListener('DOMContentLoaded', function() {
           <p id="resumeError" class="muted" style="color:var(--seal); display:none; font-size:12.5px;"></p>
         </div>
 
-        <!-- 새 방 만들기 버튼 -->
         <div class="choice-card" data-go="teacher-create">
-          <h3>새 경매방 만들기 (새 코드 발급)</h3>
-          <p>새로운 4자리 코드로 가치 목록과 예산을 새로 설정하여 시작합니다.</p>
+          <h3>새 경매방 만들기 (기본 30종 가치)</h3>
+          <p>30종의 인권 가치와 학생 제안(최대 20개) 설정으로 새 경매를 시작합니다.</p>
         </div>
       </div>
       `;
@@ -426,7 +517,7 @@ window.addEventListener('DOMContentLoaded', function() {
       <div style="margin-top:22px;" class="stack">
         <div class="row" style="justify-content:space-between; align-items:center;">
           <h3 style="font-size:16px;">경매 가치 목록 (${state.draftItems.length}개)</h3>
-          <button class="btn secondary small" id="resetDefaultsBtn">기본 목록으로 재설정</button>
+          <button class="btn secondary small" id="resetDefaultsBtn">기본 목록(30종) 재설정</button>
         </div>
         <div id="itemsList" class="stack">${itemsHtml}</div>
         <button class="btn secondary block" id="addItemBtn">+ 가치 항목 추가</button>
@@ -477,18 +568,18 @@ window.addEventListener('DOMContentLoaded', function() {
       </div>
 
       <div class="card" style="margin-bottom:16px;">
-        <h3 style="font-size:15px; margin-bottom:10px;">참여 학생 (${state.students.length}명)</h3>
-        <ul class="list-plain">${studentsHtml}</ul>
+        <h3 style="font-size:15px; margin-bottom:10px;">참여 학생 (<span id="teacherStudentCount">${state.students.length}명</span>)</h3>
+        <ul class="list-plain" id="teacherStudentList">${studentsHtml}</ul>
       </div>
 
       <div class="card" style="margin-bottom:16px;">
-        <h3 style="font-size:15px; margin-bottom:10px;">학생 제안 (${state.proposals.length}/${r.maxProposals})</h3>
-        <div class="stack">${proposalsHtml}</div>
+        <h3 style="font-size:15px; margin-bottom:10px;">학생 제안 (<span id="teacherProposalCount">${state.proposals.length}/${r.maxProposals}</span>)</h3>
+        <div class="stack" id="teacherProposalList">${proposalsHtml}</div>
       </div>
 
       <div class="card">
         <h3 style="font-size:15px; margin-bottom:8px;">경매 목록 (${(r.items || []).length}개)</h3>
-        <ul style="padding:0; margin:0;">${itemsHtml}</ul>
+        <ul style="padding:0; margin:0;" id="teacherAuctionListUl">${itemsHtml}</ul>
       </div>
 
       <button class="btn seal block" id="startAuctionBtn" style="margin-top:22px; padding:15px; font-size:16px;">경매 시작하기</button>
@@ -522,7 +613,7 @@ window.addEventListener('DOMContentLoaded', function() {
 
       <div class="card" style="margin-top:16px;">
         <h3 style="font-size:14px; margin-bottom:6px;">입찰 기록</h3>
-        <div>${historyHtml}</div>
+        <div id="teacherHistoryDiv">${historyHtml}</div>
       </div>
 
       <button class="btn secondary block" id="nextItemBtn" style="margin-top:18px;">다음 가치로 넘어가기 →</button>
@@ -656,7 +747,7 @@ window.addEventListener('DOMContentLoaded', function() {
 
       return `
       <div class="topbar"><span class="eyebrow">대기실 · 방 ${r.code}</span><span class="pill">${esc(state.studentName)}</span></div>
-      <div class="budget-strip"><span>내 예산</span><b>${budget}</b></div>
+      <div class="budget-strip"><span>내 예산</span><b id="myBudgetNum">${budget}</b></div>
 
       <div class="card center" style="padding:26px 20px;">
         <p class="eyebrow">선생님이 경매를 시작하면</p>
@@ -665,6 +756,7 @@ window.addEventListener('DOMContentLoaded', function() {
 
       <div class="card" style="margin-top:16px;">
         <h3 style="font-size:15px; margin-bottom:4px;">추가하고 싶은 가치가 있나요?</h3>
+        <p class="muted" style="font-size:12.5px; margin-bottom:10px;">선생님이 승인하면 경매 목록에 추가됩니다.</p>
         <div class="stack" style="margin-top:10px;">
           <input type="text" id="proposeValueName" placeholder="가치 이름">
           <textarea id="proposeValueDesc" placeholder="설명" style="min-height:56px;"></textarea>
@@ -674,7 +766,7 @@ window.addEventListener('DOMContentLoaded', function() {
 
       <div class="card" style="margin-top:16px;">
         <h3 style="font-size:15px; margin-bottom:8px;">내가 제안한 가치</h3>
-        <div class="stack">${myPropHtml}</div>
+        <div class="stack" id="myProposalsList">${myPropHtml}</div>
       </div>
       `;
     }
@@ -690,7 +782,7 @@ window.addEventListener('DOMContentLoaded', function() {
 
       return `
       <div class="topbar"><span class="eyebrow">경매 중 · ${idx+1}/${r.items.length}</span><span class="pill">${esc(state.studentName)}</span></div>
-      <div class="budget-strip"><span>내 남은 예산</span><b>${budget}</b></div>
+      <div class="budget-strip"><span>내 남은 예산</span><b id="myBudgetNum">${budget}</b></div>
 
       <div class="auction-stage">
         <p class="eyebrow">지금 경매 중인 가치</p>
@@ -746,6 +838,39 @@ window.addEventListener('DOMContentLoaded', function() {
     }
 
     /* ================= HANDLERS ================= */
+    function attachProposalActionHandlers(){
+      document.querySelectorAll('[data-approve]').forEach(el=>{
+        el.onclick = async () => {
+          try {
+            const pid = el.getAttribute('data-approve');
+            const p = state.proposals.find(x=>x.id===pid);
+            if(!p) return;
+            await db.collection("rooms").doc(state.roomCode).collection("proposals").doc(pid).update({ status:'approved' });
+            const newItems = [...(state.room.items || []), {id:uid(), name:p.valueName || '', desc:p.desc || '', price:50}];
+            await db.collection("rooms").doc(state.roomCode).update({ items: newItems });
+            const listUl = document.getElementById('teacherAuctionListUl');
+            if(listUl){
+              listUl.innerHTML = newItems.map((it,i)=>`<li class="muted" style="list-style:none; padding:4px 0;">${i+1}. <strong style="color:var(--ink)">${esc(it.name)}</strong> · 시작가 ${it.price}</li>`).join('');
+            }
+            toast('가치 목록에 추가했어요.');
+          } catch(err) {
+            toast('승인 처리 실패: ' + err.message);
+          }
+        };
+      });
+
+      document.querySelectorAll('[data-reject]').forEach(el=>{
+        el.onclick = async () => {
+          try {
+            const pid = el.getAttribute('data-reject');
+            await db.collection("rooms").doc(state.roomCode).collection("proposals").doc(pid).update({ status:'rejected' });
+          } catch(err) {
+            toast('거절 처리 실패: ' + err.message);
+          }
+        };
+      });
+    }
+
     function attachHandlers(){
       document.querySelectorAll('[data-go]').forEach(el=>{
         el.onclick = () => {
@@ -753,7 +878,7 @@ window.addEventListener('DOMContentLoaded', function() {
         };
       });
 
-      // ✅ 선생님: 기존 방 이어하기 버튼 클릭
+      // 기존 방 이어하기
       const resumeRoomBtn = document.getElementById('resumeRoomBtn');
       if(resumeRoomBtn) resumeRoomBtn.onclick = async () => {
         const codeInput = (document.getElementById('resumeCodeInput')?.value || '').trim();
@@ -808,7 +933,7 @@ window.addEventListener('DOMContentLoaded', function() {
         };
       });
 
-      // ✅ 새 방 만들기 버튼 (새로운 방 코드 발급)
+      // 새 방 만들기 (30종 가치 + 제안 20개 설정 적용)
       const createRoomBtn = document.getElementById('createRoomBtn');
       if(createRoomBtn) createRoomBtn.onclick = async () => {
         try {
@@ -819,7 +944,7 @@ window.addEventListener('DOMContentLoaded', function() {
           const code = roomCodeGen();
           const budget = parseInt(document.getElementById('budgetInput')?.value, 10) || 1000;
           const maxItems = parseInt(document.getElementById('maxItemsInput')?.value, 10) || 3;
-          const maxProposals = parseInt(document.getElementById('maxProposalsInput')?.value, 10) || 10;
+          const maxProposals = parseInt(document.getElementById('maxProposalsInput')?.value, 10) || 20;
           
           const room = { 
             code: code, 
@@ -837,7 +962,7 @@ window.addEventListener('DOMContentLoaded', function() {
           state.roomCode = code;
           state.role = 'teacher';
           state.room = room;
-          saveSession(); // 새 방 코드 저장
+          saveSession();
 
           bindRoomRealtime(code);
           goto('teacher-room');
@@ -849,34 +974,7 @@ window.addEventListener('DOMContentLoaded', function() {
         }
       };
 
-      // 제안 승인
-      document.querySelectorAll('[data-approve]').forEach(el=>{
-        el.onclick = async () => {
-          try {
-            const pid = el.getAttribute('data-approve');
-            const p = state.proposals.find(x=>x.id===pid);
-            if(!p) return;
-            await db.collection("rooms").doc(state.roomCode).collection("proposals").doc(pid).update({ status:'approved' });
-            const newItems = [...(state.room.items || []), {id:uid(), name:p.valueName || '', desc:p.desc || '', price:50}];
-            await db.collection("rooms").doc(state.roomCode).update({ items: newItems });
-            toast('가치 목록에 추가했어요.');
-          } catch(err) {
-            toast('승인 처리 실패: ' + err.message);
-          }
-        };
-      });
-
-      // 제안 거절
-      document.querySelectorAll('[data-reject]').forEach(el=>{
-        el.onclick = async () => {
-          try {
-            const pid = el.getAttribute('data-reject');
-            await db.collection("rooms").doc(state.roomCode).collection("proposals").doc(pid).update({ status:'rejected' });
-          } catch(err) {
-            toast('거절 처리 실패: ' + err.message);
-          }
-        };
-      });
+      attachProposalActionHandlers();
 
       // 경매 시작하기
       const startAuctionBtn = document.getElementById('startAuctionBtn');
@@ -1121,7 +1219,6 @@ window.addEventListener('DOMContentLoaded', function() {
       };
     }
 
-    // 초기 화면 실행
     render();
 
   } catch (err) {
