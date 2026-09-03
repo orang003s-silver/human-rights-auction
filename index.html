@@ -188,7 +188,6 @@ window.addEventListener('DOMContentLoaded', function() {
       toastTimer = setTimeout(()=>{ t.style.display='none'; }, 2600);
     }
 
-    // 기본 가치 30종
     const DEFAULT_VALUES = [
       {name:'생명권', desc:'모든 사람은 생명을 존중받고 안전하게 살아갈 권리가 있다', price:50},
       {name:'자유권', desc:'자신의 생각과 행동을 스스로 결정할 자유', price:50},
@@ -237,9 +236,12 @@ window.addEventListener('DOMContentLoaded', function() {
       students:[],
       proposals:[],
       bid:null,
-      unsubscribers:[],
-      countdownHandle:null,
-      finalizeTimerHandle:null,
+      unsubRoom: null,
+      unsubStudents: null,
+      unsubProposals: null,
+      unsubBid: null,
+      countdownHandle: null,
+      finalizeTimerHandle: null,
       webhookUrl:''
     };
 
@@ -260,14 +262,20 @@ window.addEventListener('DOMContentLoaded', function() {
       render();
     }
 
-    function cleanupListeners(){
-      state.unsubscribers.forEach(u => { try{ u(); }catch(e){} });
-      state.unsubscribers = [];
+    function clearTimers(){
       if(state.countdownHandle){ clearInterval(state.countdownHandle); state.countdownHandle=null; }
       if(state.finalizeTimerHandle){ clearTimeout(state.finalizeTimerHandle); state.finalizeTimerHandle=null; }
     }
 
-    function manageCountdownTicker(status, b){
+    function cleanupAllListeners(){
+      clearTimers();
+      if(state.unsubRoom){ try{state.unsubRoom();}catch(e){} state.unsubRoom=null; }
+      if(state.unsubStudents){ try{state.unsubStudents();}catch(e){} state.unsubStudents=null; }
+      if(state.unsubProposals){ try{state.unsubProposals();}catch(e){} state.unsubProposals=null; }
+      if(state.unsubBid){ try{state.unsubBid();}catch(e){} state.unsubBid=null; }
+    }
+
+    function manageCountdownTicker(status){
       if(status !== 'countdown'){
         if(state.countdownHandle){ clearInterval(state.countdownHandle); state.countdownHandle=null; }
         return;
@@ -288,9 +296,9 @@ window.addEventListener('DOMContentLoaded', function() {
 
     /* ================= REALTIME SYNC ================= */
     function bindRoomRealtime(code){
-      cleanupListeners();
+      cleanupAllListeners();
 
-      const unsubRoom = db.collection("rooms").doc(code).onSnapshot((snap) => {
+      state.unsubRoom = db.collection("rooms").doc(code).onSnapshot((snap) => {
         if(!snap.exists) {
           toast("방이 종료되었거나 존재하지 않습니다.");
           goto('home');
@@ -301,17 +309,16 @@ window.addEventListener('DOMContentLoaded', function() {
         const prevIdx = state.room?.currentIndex;
         state.room = newRoom;
         
+        // 경매 인덱스가 변경되었거나 경매가 시작되었을 때
         if(newRoom.status === 'auction' && (prevStatus !== 'auction' || prevIdx !== newRoom.currentIndex)){
           bindBidRealtime(code, newRoom.currentIndex);
-        }
-
-        if(prevStatus !== newRoom.status || prevIdx !== newRoom.currentIndex){
+          render();
+        } else if(prevStatus !== newRoom.status){
           render();
         }
       });
-      state.unsubscribers.push(unsubRoom);
 
-      const unsubStudents = db.collection("rooms").doc(code).collection("students").orderBy("joinedAt", "asc").onSnapshot((snap) => {
+      state.unsubStudents = db.collection("rooms").doc(code).collection("students").orderBy("joinedAt", "asc").onSnapshot((snap) => {
         state.students = snap.docs.map(d => d.data());
         if(state.studentId){
           const me = state.students.find(s => s.id === state.studentId);
@@ -323,21 +330,23 @@ window.addEventListener('DOMContentLoaded', function() {
         }
         updateStudentsDOM();
       });
-      state.unsubscribers.push(unsubStudents);
 
-      const unsubProposals = db.collection("rooms").doc(code).collection("proposals").orderBy("createdAt", "asc").onSnapshot((snap) => {
+      state.unsubProposals = db.collection("rooms").doc(code).collection("proposals").orderBy("createdAt", "asc").onSnapshot((snap) => {
         state.proposals = snap.docs.map(d => d.data());
         updateProposalsDOM();
       });
-      state.unsubscribers.push(unsubProposals);
     }
 
     function bindBidRealtime(code, idx){
-      const unsubBid = db.collection("rooms").doc(code).collection("bids").doc(String(idx)).onSnapshot((snap) => {
+      // 기존 입찰 리스너 및 타이머 즉시 정리 (상태 겹침 방지)
+      if(state.unsubBid){ try{state.unsubBid();}catch(e){} state.unsubBid=null; }
+      clearTimers();
+      state.bid = null;
+
+      state.unsubBid = db.collection("rooms").doc(code).collection("bids").doc(String(idx)).onSnapshot((snap) => {
         state.bid = snap.exists ? snap.data() : null;
         updateBidDOM();
       });
-      state.unsubscribers.push(unsubBid);
     }
 
     function updateProposalsDOM(){
@@ -396,7 +405,6 @@ window.addEventListener('DOMContentLoaded', function() {
       const bidAreaDiv = document.getElementById('bidAreaDiv');
       if(bidAreaDiv) bidAreaDiv.innerHTML = renderBidArea(b, item, status);
 
-      // 교사 컨트롤 버튼 갱신 (입찰자가 생기면 낙찰대기 버튼 즉시 활성화)
       const controlsDiv = document.getElementById('teacherControlsDiv');
       if(controlsDiv && state.role === 'teacher'){
         controlsDiv.innerHTML = renderTeacherControls(b, status);
@@ -410,7 +418,7 @@ window.addEventListener('DOMContentLoaded', function() {
           : `<p class="muted" style="font-size:13px;">입찰 기록이 없습니다.</p>`;
       }
 
-      manageCountdownTicker(status, b);
+      manageCountdownTicker(status);
     }
 
     function collectDraftItemsFromDOM(){
@@ -604,7 +612,7 @@ window.addEventListener('DOMContentLoaded', function() {
         ? b.history.slice().reverse().slice(0,8).map(h=>`<div class="history-row"><span>${esc(h.name)}</span><span>${h.amount}</span></div>`).join('')
         : `<p class="muted" style="font-size:13px;">입찰 기록이 없습니다.</p>`;
 
-      manageCountdownTicker(status, b);
+      manageCountdownTicker(status);
 
       return `
       <div class="topbar">
@@ -665,7 +673,6 @@ window.addEventListener('DOMContentLoaded', function() {
       `;
     }
 
-    // 낙찰 대기 버튼 활성화 조건 개선 (입찰자가 존재할 때만 활성화)
     function renderTeacherControls(b, status){
       if(status==='countdown' || status==='sold') return '';
       const hasBidder = !!(b && b.highBidderId && b.highBidderId !== '');
@@ -790,7 +797,7 @@ window.addEventListener('DOMContentLoaded', function() {
       const status = b ? b.status : 'open';
       const budget = state.myStudentData ? state.myStudentData.remainingBudget : 0;
 
-      manageCountdownTicker(status, b);
+      manageCountdownTicker(status);
 
       return `
       <div class="topbar"><span class="eyebrow">경매 중 · ${idx+1}/${r.items.length}</span><span class="pill">${esc(state.studentName)}</span></div>
@@ -889,7 +896,6 @@ window.addEventListener('DOMContentLoaded', function() {
           const idx = state.room.currentIndex;
           const currentEndAt = Date.now() + 5000;
           
-          // 카운트다운 상태로 전환
           await db.collection("rooms").doc(state.roomCode).collection("bids").doc(String(idx)).update({
             status: 'countdown',
             countdownEndAt: currentEndAt
@@ -897,7 +903,6 @@ window.addEventListener('DOMContentLoaded', function() {
 
           if(state.finalizeTimerHandle) clearTimeout(state.finalizeTimerHandle);
 
-          // 5.2초 후 Firestore의 '최신' 입찰자를 직접 조회하여 낙찰 확정
           state.finalizeTimerHandle = setTimeout(async () => {
             const bidRef = db.collection("rooms").doc(state.roomCode).collection("bids").doc(String(idx));
             const bidSnap = await bidRef.get();
@@ -932,6 +937,37 @@ window.addEventListener('DOMContentLoaded', function() {
 
       const skipBtn = document.getElementById('skipBtn');
       if(skipBtn) skipBtn.onclick = async () => { await advanceItem(); };
+    }
+
+    async function advanceItem() {
+      try {
+        clearTimers();
+        const nextIdx = state.room.currentIndex + 1;
+
+        if(nextIdx >= state.room.items.length){
+          await db.collection("rooms").doc(state.roomCode).update({ status:'ended' });
+        } else {
+          const nextItem = state.room.items[nextIdx] || { price: 50 };
+          
+          // ⚠️ 핵심 버그 수정: 새 인덱스의 비드 문서를 완벽한 초기상태로 먼저 생성
+          await db.collection("rooms").doc(state.roomCode).collection("bids").doc(String(nextIdx)).set({
+            itemIndex: nextIdx, 
+            highBid: nextItem.price, 
+            highBidderId: null, 
+            highBidderName: null, 
+            history: [], 
+            status: 'open', 
+            countdownEndAt: null, 
+            soldName: null, 
+            soldPrice: null
+          });
+
+          // 방 인덱스 업데이트 (이 업데이트로 모든 기기가 새 인덱스를 즉시 구독함)
+          await db.collection("rooms").doc(state.roomCode).update({ currentIndex: nextIdx });
+        }
+      } catch(err) {
+        alert('다음 항목 이동 실패: ' + err.message);
+      }
     }
 
     function attachHandlers(){
@@ -1038,12 +1074,10 @@ window.addEventListener('DOMContentLoaded', function() {
       attachProposalActionHandlers();
       attachTeacherControlHandlers();
 
-      // 경매 시작하기 (첫 번째 가치 시작 시 highBidderId를 null로 초기화)
       const startAuctionBtn = document.getElementById('startAuctionBtn');
       if(startAuctionBtn) startAuctionBtn.onclick = async () => {
         try {
           const firstItem = state.room.items[0] || { price: 50 };
-          await db.collection("rooms").doc(state.roomCode).update({ status:'auction', currentIndex:0 });
           await db.collection("rooms").doc(state.roomCode).collection("bids").doc("0").set({
             itemIndex: 0, 
             highBid: firstItem.price, 
@@ -1055,6 +1089,7 @@ window.addEventListener('DOMContentLoaded', function() {
             soldName: null, 
             soldPrice: null
           });
+          await db.collection("rooms").doc(state.roomCode).update({ status:'auction', currentIndex:0 });
         } catch(err) {
           alert('경매 시작 실패: ' + err.message);
         }
@@ -1062,32 +1097,6 @@ window.addEventListener('DOMContentLoaded', function() {
 
       const nextItemBtn = document.getElementById('nextItemBtn');
       if(nextItemBtn) nextItemBtn.onclick = async () => { await advanceItem(); };
-
-      async function advanceItem() {
-        try {
-          if(state.finalizeTimerHandle) clearTimeout(state.finalizeTimerHandle);
-          const nextIdx = state.room.currentIndex + 1;
-          if(nextIdx >= state.room.items.length){
-            await db.collection("rooms").doc(state.roomCode).update({ status:'ended' });
-          } else {
-            const nextItem = state.room.items[nextIdx] || { price: 50 };
-            await db.collection("rooms").doc(state.roomCode).update({ currentIndex: nextIdx });
-            await db.collection("rooms").doc(state.roomCode).collection("bids").doc(String(nextIdx)).set({
-              itemIndex: nextIdx, 
-              highBid: nextItem.price, 
-              highBidderId: null, 
-              highBidderName: null, 
-              history: [], 
-              status: 'open', 
-              countdownEndAt: null, 
-              soldName: null, 
-              soldPrice: null
-            });
-          }
-        } catch(err) {
-          alert('다음 항목 이동 실패: ' + err.message);
-        }
-      }
 
       // 학생 입장하기
       const joinBtn = document.getElementById('joinBtn');
@@ -1172,7 +1181,7 @@ window.addEventListener('DOMContentLoaded', function() {
         }
       };
 
-      // 학생 입찰하기 (카운트다운 중 추가 입찰 시 카운트다운 5초 자동 리셋)
+      // 학생 입찰하기
       const placeBidBtn = document.getElementById('placeBidBtn');
       if(placeBidBtn) placeBidBtn.onclick = async () => {
         try {
@@ -1201,7 +1210,6 @@ window.addEventListener('DOMContentLoaded', function() {
             history: history
           };
 
-          // 카운트다운 도중에 새 최고 입찰이 들어오면 카운트다운 시간을 다시 5초로 연장
           if(b && b.status === 'countdown'){
             updatePayload.countdownEndAt = Date.now() + 5000;
           }
